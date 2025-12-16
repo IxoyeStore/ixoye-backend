@@ -1,5 +1,5 @@
 /**
- *  category controller
+ * category controller
  */
 
 import { factories } from '@strapi/strapi';
