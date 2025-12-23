@@ -547,7 +547,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     origin: Schema.Attribute.Enumeration<
-      ['Mexico', 'Argentina', 'Reino Unido']
+      ['Gonher', 'Baldwin', 'Sakura', 'Emmark', 'Donaldson']
     >;
     price: Schema.Attribute.Decimal;
     productName: Schema.Attribute.String;

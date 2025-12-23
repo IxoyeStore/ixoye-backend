@@ -39,9 +39,11 @@
     "origin": {
       "type": "enumeration",
       "enum": [
-        "Mexico",
-        "Argentina",
-        "Reino Unido"
+        "Gonher",
+        "Baldwin",
+        "Sakura",
+        "Emmark",
+        "Donaldson"
       ]
     },
     "isFeatured": {
