@@ -12,21 +12,30 @@
   "pluginOptions": {},
   "attributes": {
     "categoryName": {
-      "type": "string"
+      "type": "string",
+      "required": true
     },
     "slug": {
       "type": "uid",
-      "targetField": "categoryName"
+      "targetField": "categoryName",
+      "required": true
     },
     "mainImage": {
       "type": "media",
       "multiple": false,
+      "required": true,
       "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
+        "images"
       ]
+    },
+    "isFeatured": {
+      "type": "boolean",
+      "default": false
+    },
+    "filters": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::filter.filter"
     }
   }
 }

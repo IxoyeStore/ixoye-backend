@@ -75,8 +75,8 @@ export default factories.createCoreController(
           },
           locale: "es",
           payment_method_types: ["card"],
-          success_url: `${process.env.CLIENT_URL}/success`,
-          cancel_url: `${process.env.CLIENT_URL}/successError`,
+          success_url: `${process.env.CLIENT_URL}/successError?status=success`,
+          cancel_url: `${process.env.CLIENT_URL}/successError?status=cancel`,
           line_items: lineItems,
         });
 
