@@ -1095,6 +1095,7 @@ export interface PluginUsersPermissionsUser
   extends Struct.CollectionTypeSchema {
   collectionName: 'up_users';
   info: {
+    description: 'Default User model extended';
     displayName: 'User';
     pluralName: 'users';
     singularName: 'user';
@@ -1105,13 +1106,17 @@ export interface PluginUsersPermissionsUser
   attributes: {
     birthDate: Schema.Attribute.Date;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     email: Schema.Attribute.Email &
       Schema.Attribute.Required &
-      Schema.Attribute.Unique;
+      Schema.Attribute.Unique &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 6;
+      }>;
     firstName: Schema.Attribute.String;
     lastName: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1121,9 +1126,15 @@ export interface PluginUsersPermissionsUser
     > &
       Schema.Attribute.Private;
     motherLastName: Schema.Attribute.String;
-    password: Schema.Attribute.Password & Schema.Attribute.Required;
+    password: Schema.Attribute.Password &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 6;
+      }>;
     phone: Schema.Attribute.String;
+    provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
     role: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.role'
@@ -1133,7 +1144,10 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.Private;
     username: Schema.Attribute.String &
       Schema.Attribute.Required &
-      Schema.Attribute.Unique;
+      Schema.Attribute.Unique &
+      Schema.Attribute.SetMinMaxLength<{
+        minLength: 3;
+      }>;
   };
 }
 

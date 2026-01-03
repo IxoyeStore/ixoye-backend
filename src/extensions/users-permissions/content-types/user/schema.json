@@ -4,7 +4,8 @@
   "info": {
     "singularName": "user",
     "pluralName": "users",
-    "displayName": "User"
+    "displayName": "User",
+    "description": "Default User model extended"
   },
   "options": {
     "draftAndPublish": false
@@ -12,31 +13,57 @@
   "attributes": {
     "username": {
       "type": "string",
-      "required": true,
-      "unique": true
+      "minLength": 3,
+      "unique": true,
+      "configurable": false,
+      "required": true
     },
     "email": {
       "type": "email",
+      "minLength": 6,
       "required": true,
-      "unique": true
+      "unique": true,
+      "configurable": false
+    },
+    "provider": {
+      "type": "string",
+      "configurable": false
     },
     "password": {
       "type": "password",
-      "required": true
+      "minLength": 6,
+      "configurable": false,
+      "private": true,
+      "searchable": false
+    },
+    "resetPasswordToken": {
+      "type": "string",
+      "configurable": false,
+      "private": true,
+      "searchable": false
+    },
+    "confirmationToken": {
+      "type": "string",
+      "configurable": false,
+      "private": true,
+      "searchable": false
     },
     "confirmed": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "configurable": false
     },
     "blocked": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "configurable": false
     },
     "role": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "plugin::users-permissions.role",
-      "inversedBy": "users"
+      "inversedBy": "users",
+      "configurable": false
     },
 
     "firstName": {
