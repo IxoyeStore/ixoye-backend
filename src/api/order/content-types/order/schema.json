@@ -11,11 +11,42 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "stripeid": {
+    "stripeId": {
       "type": "string"
     },
     "products": {
       "type": "json"
+    },
+    "email": {
+      "type": "email"
+    },
+    "customerName": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "total": {
+      "type": "decimal"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "orders"
+    },
+    "shippingAddress": {
+      "type": "json"
+    },
+    "orderStatus": {
+      "type": "enumeration",
+      "default": "pending",
+      "enum": [
+        "pending",
+        "paid",
+        "shipped",
+        "cancelled"
+      ]
     }
   }
 }
