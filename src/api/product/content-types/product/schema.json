@@ -24,6 +24,9 @@
       "type": "text",
       "required": true
     },
+    "stock": {
+      "type": "integer"
+    },
     "images": {
       "type": "media",
       "multiple": true,
