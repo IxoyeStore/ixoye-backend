@@ -47,6 +47,12 @@
         "shipped",
         "cancelled"
       ]
+    },
+    "subtotal": {
+      "type": "decimal"
+    },
+    "iva": {
+      "type": "decimal"
     }
   }
 }
