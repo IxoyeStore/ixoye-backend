@@ -8,6 +8,8 @@ export default [
   {
     name: "strapi::body",
     config: {
+      patchKoa: true,
+      multipart: true,
       includeUnparsed: true,
     },
   },

@@ -36,6 +36,12 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::filter.filter"
+    },
+    "products": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product.product",
+      "mappedBy": "category"
     }
   }
 }

@@ -22,38 +22,64 @@
     },
     "description": {
       "type": "text",
+      "required": false
+    },
+    "code": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "department": {
+      "type": "string",
+      "required": false
+    },
+    "subDepartment": {
+      "type": "string",
+      "required": false
+    },
+    "category": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::category.category",
+      "inversedBy": "products"
+    },
+    "productType": {
+      "type": "string",
+      "required": false
+    },
+    "price": {
+      "type": "decimal",
       "required": true
     },
+    "wholesalePrice": {
+      "type": "decimal",
+      "required": false
+    },
     "stock": {
-      "type": "integer"
+      "type": "integer",
+      "default": 0
     },
     "images": {
       "type": "media",
       "multiple": true,
       "required": false,
       "allowedTypes": [
-        "images",
-        "files"
+        "images"
       ]
+    },
+    "brand": {
+      "type": "string"
+    },
+    "series": {
+      "type": "string"
+    },
+    "isFeatured": {
+      "type": "boolean",
+      "default": false
     },
     "active": {
       "type": "boolean",
       "default": true
-    },
-    "price": {
-      "type": "decimal",
-      "required": true
-    },
-    "isFeatured": {
-      "type": "boolean"
-    },
-    "category": {
-      "type": "relation",
-      "relation": "oneToOne",
-      "target": "api::category.category"
-    },
-    "attributes": {
-      "type": "json"
     }
   }
 }

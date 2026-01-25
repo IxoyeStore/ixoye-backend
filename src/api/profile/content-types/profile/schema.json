@@ -7,15 +7,17 @@
     "displayName": "Profile"
   },
   "options": {
-    "draftAndPublish": true
+    "draftAndPublish": false
   },
   "pluginOptions": {},
   "attributes": {
     "firstName": {
-      "type": "string"
+      "type": "string",
+      "required": true
     },
     "lastName": {
-      "type": "string"
+      "type": "string",
+      "required": true
     },
     "motherLastName": {
       "type": "string"
@@ -32,6 +34,18 @@
       "type": "relation",
       "relation": "oneToOne",
       "target": "plugin::users-permissions.user"
+    },
+    "type": {
+      "type": "enumeration",
+      "required": true,
+      "default": "b2c",
+      "enum": [
+        "b2c",
+        "b2b"
+      ]
+    },
+    "companyName": {
+      "type": "string"
     }
   }
 }

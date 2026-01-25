@@ -11,9 +11,6 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "title": {
-      "type": "string"
-    },
     "content": {
       "type": "richtext"
     }

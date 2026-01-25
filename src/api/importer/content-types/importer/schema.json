@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "importers",
+  "info": {
+    "singularName": "importer",
+    "pluralName": "importers",
+    "displayName": "Importer"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "excelFile": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "fileStatus": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "processing",
+        "completed"
+      ]
+    }
+  }
+}

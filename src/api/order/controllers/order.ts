@@ -1,265 +1,317 @@
 "use strict";
-
-import Stripe from "stripe";
+import axios from "axios";
+import Openpay from "openpay";
 import { factories } from "@strapi/strapi";
 
-const stripe = new Stripe(process.env.STRIPE_KEY as string, {
-  apiVersion: "2025-12-15.clover" as any,
-});
+const openpay = new Openpay(
+  process.env.OPENPAY_MERCHANT_ID as string,
+  process.env.OPENPAY_PRIVATE_KEY as string,
+  false // false para Sandbox, true para Producción
+);
+
+async function sendConfirmationEmail(
+  strapi: any,
+  order: any,
+  products: any,
+  fullName: string,
+  addressData: any
+) {
+  try {
+    const productsList = products
+      .map(
+        (p: any) =>
+          `<div style="margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px;">
+            <span style="font-weight: bold;">${p.name}</span> (x${p.quantity}) - <span style="color: #0071b1; font-weight: bold;">$${Number(p.price).toFixed(2)} MXN</span>
+          </div>`
+      )
+      .join("");
+
+    let addressHTML = "";
+    if (addressData) {
+      const street = addressData.street || addressData.attributes?.street || "";
+      const neighborhood =
+        addressData.neighborhood || addressData.attributes?.neighborhood || "";
+      const city = addressData.city || addressData.attributes?.city || "";
+      const state = addressData.state || addressData.attributes?.state || "";
+      const cp =
+        addressData.postalCode || addressData.attributes?.postalCode || "";
+      const refs =
+        addressData.references || addressData.attributes?.references || "";
+
+      addressHTML = `
+        <p style="margin: 2px 0;">${street}, Col. ${neighborhood}</p>
+        <p style="margin: 2px 0;">${city}, ${state}</p>
+        <p style="margin: 2px 0;">CP: ${cp}</p>
+        ${refs ? `<p style="margin: 2px 0; font-style: italic; color: #888;">Ref: ${refs}</p>` : ""}
+      `;
+    } else {
+      addressHTML = `<p>Recoger en sucursal / No se especificó dirección</p>`;
+    }
+
+    await strapi.plugins["email"].services.email.send({
+      to: order.email,
+      from: "ventas@ixoye-store.com",
+      subject: `Confirmación de compra en Refacciones Ixoye - Orden #${order.id}`,
+      html: `
+        <div style="background-color: #f9f9f9; padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0;">
+            
+            <div style="background-color: #0071b1; color: white; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; font-size: 22px;">Refacciones Diésel y Agrícola Ixoye</h1>
+            </div>
+
+            <div style="padding: 40px;">
+              <h2>¡Hola, ${fullName}!</h2>
+              <p>Tu pago ha sido procesado con éxito. Aquí tienes tu resumen:</p>
+              
+              <div style="border: 1px solid #eee; border-radius: 10px; padding: 20px; margin: 20px 0;">
+                <h3 style="color: #0071b1; margin-top: 0;">Orden #${order.id}</h3>
+                ${productsList}
+                <p style="text-align: right; font-weight: bold; border-top: 2px solid #0071b1; padding-top: 10px;">
+                  Total: $${Number(order.total).toFixed(2)} MXN
+                </p>
+              </div>
+
+              <h3 style="margin-top: 30px;">Dirección de Envío</h3>
+              <div style="background-color: #fcfcfc; border: 1px solid #eee; padding: 15px; border-radius: 8px; font-size: 14px; margin-bottom: 20px;">
+                <strong>${fullName}</strong>
+                ${addressHTML}
+              </div>
+
+              <p style="font-size: 13px; color: #666; margin-top: 15px;">
+                <strong>Dudas y aclaraciones:</strong> 
+                <a href="mailto:soporte@refaccionesixoye.mx" style="color: #0071b1; text-decoration: none;">soporte@refaccionesixoye.mx</a>
+              </p>
+            </div>
+
+            <div style="background-color: #0071b1; color: white; padding: 25px; text-align: center; font-size: 12px; line-height: 1.6;">
+              <p style="margin: 0 0 10px 0; font-weight: bold; text-transform: uppercase;">Atención al Cliente e Información Legal</p>
+              <p style="margin: 0;">Para solicitar su <strong>factura</strong>, responda a este correo con sus datos fiscales <br> o envíelos a <strong>facturacion@refaccionesixoye.mx</strong></p>
+              <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 15px 0;">
+              <p style="margin: 0; opacity: 0.8;">Este es un correo automático, por favor no lo responda directamente para soporte técnico.</p>
+              <p style="margin: 10px 0 0 0;">© ${new Date().getFullYear()} Refacciones Ixoye. Todos los derechos reservados.</p>
+            </div>
+
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Correo de confirmación enviado para la orden #${order.id}`);
+  } catch (err) {
+    console.error("❌ Error enviando email:", err);
+  }
+}
 
 export default factories.createCoreController(
   "api::order.order",
   ({ strapi }) => ({
     async create(ctx) {
       try {
-        const { products, email, fullName, phone, userId } =
-          ctx.request.body?.data || {};
+        const userSession = ctx.state.user;
+        if (!userSession) return ctx.unauthorized("Sesión inválida.");
 
-        if (!Array.isArray(products)) {
-          ctx.throw(400, "Products are required");
+        const { products, email, phone } = ctx.request.body?.data || {};
+
+        if (!products || products.length === 0) {
+          return ctx.badRequest("El carrito está vacío.");
         }
 
-        const TAX_RATE_ID = process.env.STRIPE_TAX_RATE_ID;
-        console.log("🔍 DEBUG - TAX ID:", TAX_RATE_ID);
+        const userProfile = await strapi.db
+          .query("api::profile.profile")
+          .findOne({
+            where: { users_permissions_user: userSession.id },
+          });
+
+        const userAddress =
+          (await strapi.db.query("api::address.address").findOne({
+            where: { users_permissions_user: userSession.id, isDefault: true },
+          })) ||
+          (await strapi.db.query("api::address.address").findOne({
+            where: { users_permissions_user: userSession.id },
+          }));
+
+        const fullName =
+          `${userProfile?.firstName || userSession.username || "Cliente"} ${userProfile?.lastName || ""}`.trim();
 
         let totalAmount = 0;
-
         const detailedProducts = await Promise.all(
-          products.map(async ({ id, quantity }) => {
+          products.map(async (p: any) => {
             const item = await strapi.entityService.findOne(
               "api::product.product",
-              Number(id),
-              { fields: ["productName", "price", "stock"] }
+              p.id
             );
-
-            if (!item) throw new Error(`Product ${id} not found`);
-
-            const qty = Number(quantity) || 1;
-            const currentStock = Number(item.stock) || 0;
-
-            if (currentStock <= 0) {
-              throw new Error(
-                `Lo sentimos, el producto "${item.productName}" se ha agotado.`
-              );
-            }
-
-            if (currentStock < qty) {
-              throw new Error(
-                `Solo quedan ${currentStock} unidades de "${item.productName}".`
-              );
-            }
-            // ---------------------------
-
-            const unitAmount = Math.round(Number(item.price) * 100);
-            totalAmount += Number(item.price) * qty;
-
+            if (!item) throw new Error(`Producto con ID ${p.id} no encontrado`);
+            totalAmount += Number(item.price) * (Number(p.quantity) || 1);
             return {
               id: item.id,
               name: item.productName,
               price: item.price,
-              quantity: qty,
-              stripeData: {
-                price_data: {
-                  currency: "mxn",
-                  product_data: { name: item.productName },
-                  unit_amount: unitAmount,
-                  tax_behavior: "inclusive",
-                },
-                quantity: qty,
-                ...(TAX_RATE_ID ? { tax_rates: [TAX_RATE_ID] } : {}),
-              },
+              quantity: Number(p.quantity) || 1,
             };
           })
         );
 
-        const session = await stripe.checkout.sessions.create({
-          mode: "payment",
-          customer_email: email,
-          automatic_tax: { enabled: false },
-          shipping_address_collection: { allowed_countries: ["MX"] },
-          locale: "es",
-          payment_method_types: ["card"],
-          success_url: `${process.env.CLIENT_URL}/successError?status=success`,
-          cancel_url: `${process.env.CLIENT_URL}/successError?status=cancel`,
-          line_items: detailedProducts.map((p) => p.stripeData),
-          payment_intent_data: {
-            metadata: {
-              customer_name: fullName,
-              customer_phone: phone,
-              strapi_user_id: userId,
-            },
+        const finalAmountStr = totalAmount.toFixed(2);
+        const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
+        const merchantId = (process.env.OPENPAY_MERCHANT_ID || "").trim();
+        const authHeader = Buffer.from(`${privateKey}:`).toString("base64");
+        const uniqueOrderId = `ORD${Date.now()}`;
+
+        let checkoutSession: any;
+
+        const checkoutRequest = {
+          amount: finalAmountStr,
+          currency: "MXN",
+          description: "Compra Ixoye Store",
+          order_id: uniqueOrderId,
+          send_email: "false",
+          customer: {
+            name: userProfile?.firstName || "Cliente",
+            last_name: userProfile?.lastName || "Ixoye",
+            phone_number: (phone || userProfile?.phone || "5555555555")
+              .replace(/\D/g, "")
+              .slice(-10),
+            email: userSession.email,
+          },
+          redirect_url: "http://localhost:3000/success",
+        };
+
+        const response = await axios({
+          method: "post",
+          url: `https://sandbox-api.openpay.mx/v1/${merchantId}/checkouts`,
+          data: checkoutRequest,
+          headers: {
+            Authorization: `Basic ${authHeader}`,
+            "Content-Type": "application/json",
           },
         });
+        checkoutSession = response.data;
+
+        const phoneToSave = (phone || userProfile?.phone || "5500000000")
+          .replace(/\D/g, "")
+          .slice(-10);
 
         await strapi.entityService.create("api::order.order", {
           data: {
-            products: detailedProducts.map(({ id, name, price, quantity }) => ({
-              id,
-              name,
-              price,
-              quantity,
-            })),
-            stripeId: session.id,
-            email,
+            products: detailedProducts,
+            email: (email || userSession.email).trim(),
             customerName: fullName,
-            phone,
-            total: totalAmount,
+            phone: phoneToSave,
+            total: parseFloat(finalAmountStr),
             orderStatus: "pending",
+            user: userSession.id,
+            shippingAddress: userAddress,
+            stripeId: uniqueOrderId,
             publishedAt: new Date(),
-            user: userId,
           } as any,
         });
 
-        return { stripeSession: session };
+        return { data: { url: checkoutSession.checkout_link } };
       } catch (error: any) {
-        console.error("❌ ERROR EN CREATE ORDER:", error);
-        ctx.throw(500, error.message || "Internal Server Error");
+        console.error(
+          "❌ ERROR EN CREATE:",
+          error.response?.data || error.message
+        );
+        return ctx.badRequest(error.message || "Error al procesar la orden");
       }
     },
 
     async webhook(ctx) {
-      const sig = ctx.request.headers["stripe-signature"];
-      let event;
-
       try {
-        const body =
-          ctx.request.body[Symbol.for("unparsedBody")] || ctx.request.body;
-        event = stripe.webhooks.constructEvent(
-          body,
-          sig,
-          process.env.STRIPE_WEBHOOK_SECRET as string
+        const { type, transaction, verification_code } = ctx.request.body;
+
+        console.log(
+          "📦 CUERPO DEL WEBHOOK:",
+          JSON.stringify(ctx.request.body, null, 2)
         );
-      } catch (err: any) {
-        return ctx.badRequest(`Webhook Error: ${err.message}`);
-      }
+        console.log(`📩 Evento Recibido de Openpay: ${type}`);
 
-      if (event.type === "checkout.session.completed") {
-        const session = event.data.object as any;
-        const totalFinal = session.amount_total / 100;
-        const montoIVA = (session.total_details?.amount_tax || 0) / 100;
-        const subtotalReal = totalFinal - montoIVA;
+        if (type === "verification") {
+          console.log("🔑 Código de Verificación Openpay:", verification_code);
+          return ctx.send({ received: true });
+        }
 
-        const shippingDetails =
-          session.shipping_details ||
-          session.shipping ||
-          (session.customer_details && session.customer_details.address
-            ? session.customer_details
-            : null);
-
-        const orders = await strapi.entityService.findMany("api::order.order", {
-          filters: { stripeId: session.id },
-        });
-
-        if (orders.length > 0) {
-          const order = orders[0];
-
-          const dataToSave = shippingDetails
-            ? JSON.parse(JSON.stringify(shippingDetails))
-            : {
-                note: "Stripe no envió objeto shipping_details",
-                email: session.customer_email,
-              };
-
-          await strapi.entityService.update("api::order.order", order.id, {
-            data: {
-              orderStatus: "paid",
-              shippingAddress: dataToSave,
-              total: totalFinal,
-              iva: montoIVA,
-              subtotal: subtotalReal,
-            } as any,
-          });
-
-          const productsArray = order.products as any[];
-          await Promise.all(
-            productsArray.map(async (p: any) => {
-              try {
-                const currentProduct = await strapi.entityService.findOne(
-                  "api::product.product",
-                  p.id
-                );
-                if (
-                  currentProduct &&
-                  typeof currentProduct.stock === "number"
-                ) {
-                  const newStock = currentProduct.stock - (p.quantity || 1);
-                  await strapi.entityService.update(
-                    "api::product.product",
-                    p.id,
-                    {
-                      data: { stock: Math.max(0, newStock) },
-                      publishedAt: new Date().toISOString(),
-                    }
-                  );
-                }
-              } catch (e) {
-                console.error("Error stock:", e);
-              }
-            })
+        if (
+          type === "verification.payment.checkout.completed" ||
+          type === "charge.confirmed" ||
+          type === "charge.succeeded"
+        ) {
+          const openpayId = transaction?.id;
+          const openpayOrderId = transaction.order_id;
+          console.log(
+            `🔍 Buscando orden. Transacción: ${openpayId}, OrderID: ${openpayOrderId}`
           );
 
-          try {
-            const productsList = productsArray
-              .map(
-                (p: any) =>
-                  `<div style="padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
-                  <p style="margin: 0; color: #000; font-weight: bold; font-size: 14px;">
-                    ${p.name} (Cant: ${p.quantity || 1}) - $${p.price} MXN
-                  </p>
-                </div>`
-              )
-              .join("");
+          if (!openpayId) {
+            console.log("❌ Webhook sin ID de transacción");
+            return ctx.send({ received: true });
+          }
 
-            await strapi.plugins["email"].services.email.send({
-              to:
-                session.customer_details?.email ||
-                session.customer_email ||
-                order.email,
-              from: "ventas@ixoye-store.com",
-              subject: `Confirmación de compra en Refacciones Ixoye- Orden #${order.id}`,
-              html: `
-  <div style="background-color: #f4f4f4; padding: 40px 10px; font-family: sans-serif;">
-    <div style="max-width: 550px; margin: auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-      <div style="background-color: #0071b1; color: white; padding: 25px; text-align: center;">
-        <h1 style="margin: 0; font-size: 24px;">Refacciones Diésel y Agrícola Ixoye</h1>
-      </div>
-      <div style="padding: 30px 40px;">
-        <h2 style="color: #000;">¡Hola, ${order.customerName}!</h2>
-        <p style="color: #666; font-size: 14px;">✅ Tu pedido ha sido recibido y está siendo procesado. Aquí tienes un resumen de tu compra:</p>
-        <div style="border: 1px solid #f0f0f0; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
-          <h4 style="margin: 0 0 15px 0; color: #000; font-size: 16px;">Detalle del Pedido #${order.id}</h4>
-          ${productsList}
-          <div style="text-align: right; margin-top: 15px;">
-            <p style="margin: 0; font-size: 13px; color: #666;">Subtotal: $${subtotalReal.toFixed(2)} MXN</p>
-            <p style="margin: 5px 0; font-size: 13px; color: #666;">IVA (16% incluido): $${montoIVA.toFixed(2)} MXN</p>
-            <p style="margin: 10px 0 0 0; font-size: 18px; font-weight: bold; color: #000;">Total Pagado: $${totalFinal.toFixed(2)} MXN</p>
-          </div>
-        </div>
-        <h4 style="color: #333;">Dirección de Envío</h4>
-        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; font-size: 14px; color: #888;">
-          <p style="margin: 0;">${dataToSave.address?.line1 || ""}</p>
-          <p style="margin: 0;">${dataToSave.address?.city || ""}.</p>
-          <p style="margin: 0;">CP: ${dataToSave.address?.postal_code || ""}</p>
-        </div>
-        <p style="margin-top: 30px; font-size: 13px; color: #888; text-align: center;">
-          Si tienes alguna duda con tu pedido, escríbenos a <a href="mailto:soporte@ixoye.com" style="color: #0071b1; text-decoration: none;">soporte@ixoye.com</a>.
-        </p>
-      </div>
-      <div style="background-color: #0071b1; color: white; padding: 25px; text-align: center; font-size: 12px; line-height: 1.5;">
-        <p style="margin: 0 0 8px 0;">Este es un correo automático, por favor no respondas directamente.</p>
-        <p style="margin: 0 0 12px 0;">© 2026 Refacciones Diésel y Agrícola Ixoye.</p>
-        <a href="${process.env.CLIENT_URL}" style="color: white; font-weight: bold; text-decoration: none; border-bottom: 1px solid white;">Visitar Tienda</a>
-      </div>
-    </div>
-  </div>
-`,
-            });
-          } catch (emailErr) {
-            console.error("❌ Error enviando correo:", emailErr);
+          console.log("🔍 Buscando en DB la orden con stripeId:", openpayId);
+
+          const order = await strapi.db.query("api::order.order").findOne({
+            where: {
+              stripeId: openpayOrderId,
+            },
+            populate: ["products", "shippingAddress"],
+          });
+
+          if (!order) {
+            console.log(
+              "❌ No se encontró la orden con los IDs proporcionados."
+            );
+            return ctx.send({ received: true });
+          }
+
+          if (order.orderStatus !== "paid") {
+            const updatedOrder = await strapi.entityService.update(
+              "api::order.order",
+              order.id,
+              { data: { orderStatus: "paid" } }
+            );
+            console.log(`✅ Orden #${order.id} marcada como PAGADA`);
+
+            console.log("📦 Actualizando stock de productos...");
+            if (order.products && Array.isArray(order.products)) {
+              for (const item of order.products) {
+                const product = await strapi.entityService.findOne(
+                  "api::product.product",
+                  item.id
+                );
+                if (product) {
+                  const currentStock = Number(product.stock || 0);
+                  const quantitySold = Number(item.quantity || 0);
+                  const newStock = Math.max(0, currentStock - quantitySold);
+
+                  await strapi.entityService.update(
+                    "api::product.product",
+                    item.id,
+                    { data: { stock: newStock } }
+                  );
+                  console.log(
+                    `🔹 Producto: ${product.productName} | Nuevo Stock: ${newStock}`
+                  );
+                }
+              }
+            }
+
+            await sendConfirmationEmail(
+              strapi,
+              updatedOrder,
+              order.products,
+              order.customerName,
+              order.shippingAddress
+            );
+          } else {
+            console.log(`ℹ️ La orden #${order.id} ya estaba pagada.`);
           }
         }
+
+        return ctx.send({ received: true });
+      } catch (error: any) {
+        console.error("❌ Error en el Webhook:", error);
+        return ctx.badRequest("Webhook Error");
       }
-      return { received: true };
     },
   })
 );
