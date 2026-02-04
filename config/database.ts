@@ -7,11 +7,11 @@ export default ({ env }) => {
     postgres: {
       connection: {
         connectionString: env("DATABASE_URL"),
-        host: env("DATABASE_HOST", "localhost"),
-        port: env.int("DATABASE_PORT", 5432),
-        database: env("DATABASE_NAME", "ixoye-store"),
-        user: env("DATABASE_USERNAME", ""),
-        password: env("DATABASE_PASSWORD", ""),
+        host: env("DATABASE_HOST") || env("PGHOST") || "localhost",
+        port: env.int("DATABASE_PORT") || env.int("PGPORT") || 5432,
+        database: env("DATABASE_NAME") || env("PGDATABASE") || "ixoye-store",
+        user: env("DATABASE_USERNAME") || env("PGUSER") || "",
+        password: env("DATABASE_PASSWORD") || env("PGPASSWORD") || "",
         ssl: env.bool("DATABASE_SSL", false)
           ? {
               rejectUnauthorized: env.bool(
