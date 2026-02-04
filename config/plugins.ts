@@ -1,21 +1,32 @@
 export default ({ env }) => ({
-  "users-permissions": {
-    enabled: true,
-  },
   email: {
     config: {
       provider: "nodemailer",
       providerOptions: {
-        host: "smtp.ethereal.email",
-        port: 587,
+        host: env("SMTP_HOST"),
+        port: env.int("SMTP_PORT", 587),
         auth: {
-          user: "jordan.flatley@ethereal.email",
-          pass: "6UP7QxSQ4Mfc2zHXnY",
+          user: env("SMTP_USERNAME"),
+          pass: env("SMTP_PASSWORD"),
         },
       },
       settings: {
-        defaultFrom: "ventas@ixoye-store.com",
-        defaultReplyTo: "soporte@ixoye-store.com",
+        defaultFrom: env("SMTP_FROM", "ecommerce@refaccionesixoye.mx"),
+        defaultReplyTo: env("SMTP_REPLY_TO", "ecommerce@refaccionesixoye.mx"),
+      },
+    },
+  },
+  upload: {
+    config: {
+      provider: "cloudinary",
+      providerOptions: {
+        cloud_name: env("CLOUDINARY_NAME"),
+        api_key: env("CLOUDINARY_KEY"),
+        api_secret: env("CLOUDINARY_SECRET"),
+      },
+      actionOptions: {
+        upload: {},
+        delete: {},
       },
     },
   },
