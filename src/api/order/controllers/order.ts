@@ -165,9 +165,9 @@ export default factories.createCoreController(
         const checkoutRequest = {
           amount: finalAmountStr,
           currency: "MXN",
-          description: "Compra Ixoye Store",
+          description: `Refacciones Diésel y Agricola Ixoye - Subtotal: $${subtotal.toFixed(2)} + IVA: $${iva.toFixed(2)}`,
           order_id: uniqueOrderId,
-          send_email: "false",
+          send_email: false,
           customer: {
             name: userProfile?.firstName || "Cliente",
             last_name: userProfile?.lastName || "Ixoye",
