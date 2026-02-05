@@ -6,7 +6,7 @@ import { factories } from "@strapi/strapi";
 const openpay = new Openpay(
   process.env.OPENPAY_MERCHANT_ID as string,
   process.env.OPENPAY_PRIVATE_KEY as string,
-  false // false para Sandbox, true para Producción
+  false, // false para Sandbox, true para Producción
 );
 
 async function sendConfirmationEmail(
@@ -14,7 +14,7 @@ async function sendConfirmationEmail(
   order: any,
   products: any,
   fullName: string,
-  addressData: any
+  addressData: any,
 ) {
   try {
     const productsList = products
@@ -22,7 +22,7 @@ async function sendConfirmationEmail(
         (p: any) =>
           `<div style="margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px;">
             <span style="font-weight: bold;">${p.name}</span> (x${p.quantity}) - <span style="color: #0071b1; font-weight: bold;">$${Number(p.price).toFixed(2)} MXN</span>
-          </div>`
+          </div>`,
       )
       .join("");
 
@@ -136,19 +136,20 @@ export default factories.createCoreController(
         let totalAmount = 0;
         const detailedProducts = await Promise.all(
           products.map(async (p: any) => {
-            const item = await strapi.entityService.findOne(
+            const item = (await strapi.entityService.findOne(
               "api::product.product",
-              p.id
-            );
+              p.id,
+            )) as any;
             if (!item) throw new Error(`Producto con ID ${p.id} no encontrado`);
             totalAmount += Number(item.price) * (Number(p.quantity) || 1);
             return {
               id: item.id,
+              documentId: item.documentId,
               name: item.productName,
               price: item.price,
               quantity: Number(p.quantity) || 1,
             };
-          })
+          }),
         );
 
         const finalAmountStr = totalAmount.toFixed(2);
@@ -156,6 +157,8 @@ export default factories.createCoreController(
         const merchantId = (process.env.OPENPAY_MERCHANT_ID || "").trim();
         const authHeader = Buffer.from(`${privateKey}:`).toString("base64");
         const uniqueOrderId = `ORD${Date.now()}`;
+        const subtotal = totalAmount / 1.16;
+        const iva = totalAmount - subtotal;
 
         let checkoutSession: any;
 
@@ -173,7 +176,11 @@ export default factories.createCoreController(
               .slice(-10),
             email: userSession.email,
           },
-          redirect_url: "http://localhost:3000/success",
+          metadata: {
+            subtotal: subtotal.toFixed(2),
+            iva: iva.toFixed(2),
+          },
+          redirect_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/success`,
         };
 
         const response = await axios({
@@ -191,18 +198,20 @@ export default factories.createCoreController(
           .replace(/\D/g, "")
           .slice(-10);
 
-        await strapi.entityService.create("api::order.order", {
+        await strapi.documents("api::order.order").create({
           data: {
             products: detailedProducts,
             email: (email || userSession.email).trim(),
             customerName: fullName,
             phone: phoneToSave,
             total: parseFloat(finalAmountStr),
+            subtotal: parseFloat(subtotal.toFixed(2)),
+            iva: parseFloat(iva.toFixed(2)),
             orderStatus: "pending",
             user: userSession.id,
             shippingAddress: userAddress,
             stripeId: uniqueOrderId,
-            publishedAt: new Date(),
+            status: "published",
           } as any,
         });
 
@@ -210,7 +219,7 @@ export default factories.createCoreController(
       } catch (error: any) {
         console.error(
           "❌ ERROR EN CREATE:",
-          error.response?.data || error.message
+          error.response?.data || error.message,
         );
         return ctx.badRequest(error.message || "Error al procesar la orden");
       }
@@ -222,96 +231,99 @@ export default factories.createCoreController(
 
         console.log(
           "📦 CUERPO DEL WEBHOOK:",
-          JSON.stringify(ctx.request.body, null, 2)
+          JSON.stringify(ctx.request.body, null, 2),
         );
-        console.log(`📩 Evento Recibido de Openpay: ${type}`);
 
         if (type === "verification") {
-          console.log("🔑 Código de Verificación Openpay:", verification_code);
           return ctx.send({ received: true });
         }
 
-        if (
-          type === "verification.payment.checkout.completed" ||
-          type === "charge.confirmed" ||
-          type === "charge.succeeded"
-        ) {
-          const openpayId = transaction?.id;
-          const openpayOrderId = transaction.order_id;
-          console.log(
-            `🔍 Buscando orden. Transacción: ${openpayId}, OrderID: ${openpayOrderId}`
-          );
+        const successEvents = [
+          "verification.payment.checkout.completed",
+          "charge.confirmed",
+          "charge.succeeded",
+        ];
 
-          if (!openpayId) {
-            console.log("❌ Webhook sin ID de transacción");
+        if (successEvents.includes(type)) {
+          const openpayOrderId = transaction?.order_id;
+
+          if (!openpayOrderId) {
+            console.log("❌ Webhook sin order_id");
             return ctx.send({ received: true });
           }
 
-          console.log("🔍 Buscando en DB la orden con stripeId:", openpayId);
-
-          const order = await strapi.db.query("api::order.order").findOne({
-            where: {
+          const order = await strapi.documents("api::order.order").findFirst({
+            filters: {
               stripeId: openpayOrderId,
             },
-            populate: ["products", "shippingAddress"],
           });
 
           if (!order) {
             console.log(
-              "❌ No se encontró la orden con los IDs proporcionados."
+              `❌ No se encontró la orden con stripeId: ${openpayOrderId}`,
             );
             return ctx.send({ received: true });
           }
 
           if (order.orderStatus !== "paid") {
-            const updatedOrder = await strapi.entityService.update(
-              "api::order.order",
-              order.id,
-              { data: { orderStatus: "paid" } }
-            );
-            console.log(`✅ Orden #${order.id} marcada como PAGADA`);
+            const updatedOrder = await strapi
+              .documents("api::order.order")
+              .update({
+                documentId: order.documentId,
+                data: { orderStatus: "paid" },
+              });
 
-            console.log("📦 Actualizando stock de productos...");
-            if (order.products && Array.isArray(order.products)) {
-              for (const item of order.products) {
-                const product = await strapi.entityService.findOne(
-                  "api::product.product",
-                  item.id
-                );
-                if (product) {
-                  const currentStock = Number(product.stock || 0);
-                  const quantitySold = Number(item.quantity || 0);
-                  const newStock = Math.max(0, currentStock - quantitySold);
+            console.log(`✅ Orden ${order.documentId} marcada como PAGADA`);
 
-                  await strapi.entityService.update(
-                    "api::product.product",
-                    item.id,
-                    { data: { stock: newStock } }
-                  );
-                  console.log(
-                    `🔹 Producto: ${product.productName} | Nuevo Stock: ${newStock}`
-                  );
+            const productsList = order.products as any;
+
+            if (Array.isArray(productsList)) {
+              for (const item of productsList) {
+                const pId = item.documentId || item.id;
+                const qtySold = Number(item.quantity || 0);
+
+                if (pId) {
+                  const product = await strapi
+                    .documents("api::product.product")
+                    .findOne({
+                      documentId: pId,
+                    });
+
+                  if (product) {
+                    const currentStock = Number(product.stock || 0);
+                    const newStock = Math.max(0, currentStock - qtySold);
+
+                    await strapi.documents("api::product.product").update({
+                      documentId: product.documentId,
+                      data: { stock: newStock },
+                    });
+                    console.log(
+                      `🔹 Stock actualizado: ${product.productName} -> ${newStock}`,
+                    );
+                  }
                 }
               }
             }
 
-            await sendConfirmationEmail(
-              strapi,
-              updatedOrder,
-              order.products,
-              order.customerName,
-              order.shippingAddress
-            );
-          } else {
-            console.log(`ℹ️ La orden #${order.id} ya estaba pagada.`);
+            try {
+              await sendConfirmationEmail(
+                strapi,
+                updatedOrder,
+                order.products,
+                order.customerName,
+                order.shippingAddress,
+              );
+            } catch (e) {
+              console.error("⚠️ Error email:", e);
+            }
           }
         }
 
         return ctx.send({ received: true });
-      } catch (error: any) {
-        console.error("❌ Error en el Webhook:", error);
+      } catch (error) {
+        console.error("❌ Error crítico:", error);
         return ctx.badRequest("Webhook Error");
       }
     },
-  })
+  }),
 );
