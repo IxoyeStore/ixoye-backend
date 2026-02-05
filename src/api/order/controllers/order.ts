@@ -165,7 +165,7 @@ export default factories.createCoreController(
         const checkoutRequest = {
           amount: finalAmountStr,
           currency: "MXN",
-          description: `Refacciones Diesel y Agricola Ixoye - Subtotal: MXN${subtotal.toFixed(2)} + IVA: MXN${iva.toFixed(2)}`,
+          description: "Compra en Refacciones Diesel y Agricola Ixoye",
           order_id: uniqueOrderId,
           send_email: false,
           customer: {
