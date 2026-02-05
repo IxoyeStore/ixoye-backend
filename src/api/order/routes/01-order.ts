@@ -2,10 +2,12 @@ export default {
   routes: [
     {
       method: "POST",
-      path: "/openpay-webhook",
-      handler: "api::order.order.webhook",
+      path: "/orders/webhook",
+      handler: "order.webhook",
       config: {
         auth: false,
+        policies: [],
+        middlewares: [],
       },
     },
   ],
