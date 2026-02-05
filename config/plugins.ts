@@ -9,10 +9,14 @@ export default ({ env }) => ({
           user: env("SMTP_USERNAME"),
           pass: env("SMTP_PASSWORD"),
         },
+        secure: env.int("SMTP_PORT") === 465,
+        tls: {
+          rejectUnauthorized: false,
+        },
       },
       settings: {
-        defaultFrom: env("SMTP_FROM", "ecommerce@refaccionesixoye.mx"),
-        defaultReplyTo: env("SMTP_REPLY_TO", "ecommerce@refaccionesixoye.mx"),
+        defaultFrom: env("SMTP_FROM", "soporte@refaccionesixoye.mx"),
+        defaultReplyTo: env("SMTP_REPLY_TO", "soporte@refaccionesixoye.mx"),
       },
     },
   },
