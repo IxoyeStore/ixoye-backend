@@ -3,10 +3,10 @@ export default ({ env }) => ({
     config: {
       provider: "strapi-provider-email-resend",
       providerOptions: {
-        apiKey: env("re_BChdVrnn_QC8YS8La3uP4ZVSiChD9nuYp"),
+        apiKey: env("RESEND_API_KEY"),
       },
       settings: {
-        defaultFrom: "soporte@refaccionesixoye.mx",
+        defaultFrom: "soporte@send.refaccionesixoye.mx",
         defaultReplyTo: "soporte@refaccionesixoye.mx",
       },
     },
