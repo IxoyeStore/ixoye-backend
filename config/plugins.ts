@@ -1,23 +1,13 @@
 export default ({ env }) => ({
   email: {
     config: {
-      provider: "nodemailer",
+      provider: "resend",
       providerOptions: {
-        host: env("SMTP_HOST"),
-        port: env.int("SMTP_PORT", 465),
-        auth: {
-          user: env("SMTP_USERNAME"),
-          pass: env("SMTP_PASSWORD"),
-        },
-        secure: true,
-        tls: {
-          rejectUnauthorized: false,
-          ciphers: "SSLv3",
-        },
+        apiKey: env("re_BChdVrnn_QC8YS8La3uP4ZVSiChD9nuYp"),
       },
       settings: {
-        defaultFrom: env("SMTP_FROM", "soporte@refaccionesixoye.mx"),
-        defaultReplyTo: env("SMTP_REPLY_TO", "soporte@refaccionesixoye.mx"),
+        defaultFrom: "soporte@refaccionesixoye.mx",
+        defaultReplyTo: "soporte@refaccionesixoye.mx",
       },
     },
   },
