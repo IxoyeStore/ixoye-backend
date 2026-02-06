@@ -27,7 +27,17 @@ export default [
       },
     },
   },
-  "strapi::cors",
+  {
+    name: "strapi::cors",
+    config: {
+      origin: [
+        "http://localhost:3000",
+        "https://www.refaccionesixoye.mx",
+        "https://refaccionesixoye.mx",
+        "https://ixoye-frontend.vercel.app",
+      ],
+    },
+  },
   "strapi::poweredBy",
   "strapi::query",
   {
