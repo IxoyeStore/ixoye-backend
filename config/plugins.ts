@@ -1,7 +1,7 @@
 export default ({ env }) => ({
   email: {
     config: {
-      provider: "resend",
+      provider: "strapi-provider-email-resend",
       providerOptions: {
         apiKey: env("re_BChdVrnn_QC8YS8La3uP4ZVSiChD9nuYp"),
       },
