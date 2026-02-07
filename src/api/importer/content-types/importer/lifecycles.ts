@@ -59,16 +59,16 @@ export default {
 };
 
 async function processExcelImport(result: any) {
-  const entry: any = await strapi.entityService.findOne(
-    "api::importer.importer",
-    result.id,
-    { populate: ["excelFile"] },
-  );
+  const entry: any = await strapi.documents("api::importer.importer").findOne({
+    documentId: result.documentId,
+    populate: ["excelFile"],
+  });
 
   if (!entry?.excelFile?.url) return;
 
   try {
-    await strapi.entityService.update("api::importer.importer", result.id, {
+    await strapi.documents("api::importer.importer").update({
+      documentId: result.documentId,
       data: { fileStatus: "processing" },
     });
 
@@ -88,39 +88,19 @@ async function processExcelImport(result: any) {
     for (const row of dataRows as any[]) {
       const code = String(row["codigo"] || "").trim();
       const description = String(row["descripcion"] || "").trim();
-      const excelDept = String(row["departamento"] || "").trim();
-      const excelSubDept = String(row["subDepartamento"] || "").trim();
-      const excelSeries = String(row["series"] || "").trim();
-      const excelCategory = String(row["categoria"] || "").trim();
-      const excelProductType = String(row["tipoProducto"] || "").trim();
-      const excelBrand = String(row["marca"] || row["brand"] || "").trim();
-      const imageName = String(row["imagen"] || "").trim();
 
       if (!code || !description) continue;
 
       let categoryId = null;
-      if (excelCategory) {
+      if (row["categoria"]) {
         const foundCategory = await strapi.db
           .query("api::category.category")
           .findOne({
-            where: { categoryName: excelCategory },
+            where: { categoryName: String(row["categoria"]).trim() },
           });
         if (foundCategory) categoryId = foundCategory.id;
       }
       if (!categoryId && defaultCategory) categoryId = defaultCategory.id;
-
-      let imageId = null;
-      if (imageName) {
-        const files = await strapi.db.query("plugin::upload.file").findMany({
-          where: {
-            $or: [
-              { name: { $contains: imageName } },
-              { hash: { $contains: imageName.split(".")[0] } },
-            ],
-          },
-        });
-        if (files && files.length > 0) imageId = files[0].id;
-      }
 
       const productPayload: any = {
         productName: description,
@@ -129,32 +109,29 @@ async function processExcelImport(result: any) {
         wholesalePrice: cleanNumber(row["precioMayoreo"]),
         stock: Math.floor(cleanNumber(row["stock"] || 0)),
         code: code,
-        department: excelDept,
-        subDepartment: excelSubDept,
-        productType: excelProductType,
-        brand: excelBrand,
-        series: excelSeries,
+        department: String(row["departamento"] || "").trim(),
+        subDepartment: String(row["subDepartamento"] || "").trim(),
+        productType: String(row["tipoProducto"] || "").trim(),
+        brand: String(row["marca"] || row["brand"] || "").trim(),
+        series: String(row["series"] || "").trim(),
         active: true,
         category: categoryId ? Number(categoryId) : null,
       };
-
-      if (imageId) productPayload.images = [imageId];
 
       const existingProduct = await strapi.db
         .query("api::product.product")
         .findOne({ where: { code: code } });
 
       if (existingProduct) {
-        await strapi.entityService.update(
-          "api::product.product",
-          existingProduct.id,
-          { data: productPayload },
-        );
+        await strapi.documents("api::product.product").update({
+          documentId: existingProduct.documentId,
+          data: productPayload,
+        });
         console.log(`🔄 ACTUALIZADO: ${code}`);
       } else {
         productPayload.slug = await generateUniqueSlug(description);
         productPayload.isFeatured = false;
-        await strapi.entityService.create("api::product.product", {
+        await strapi.documents("api::product.product").create({
           data: productPayload,
         });
         console.log(`✨ CREADO: ${code}`);
@@ -162,15 +139,15 @@ async function processExcelImport(result: any) {
       processedCount++;
     }
 
-    await strapi.entityService.update("api::importer.importer", result.id, {
+    await strapi.documents("api::importer.importer").update({
+      documentId: result.documentId,
       data: { fileStatus: "completed" },
     });
-    console.log(
-      `✅ Importación exitosa: ${processedCount} productos procesados.`,
-    );
+    console.log(`✅ Importación exitosa: ${processedCount} productos.`);
   } catch (error) {
     console.error("❌ Error en el importador:", error);
-    await strapi.entityService.update("api::importer.importer", result.id, {
+    await strapi.documents("api::importer.importer").update({
+      documentId: result.documentId,
       data: { fileStatus: "completed" },
     });
   }
