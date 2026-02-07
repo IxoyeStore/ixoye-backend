@@ -133,6 +133,8 @@ export default factories.createCoreController(
         const fullName =
           `${userProfile?.firstName || userSession.username || "Cliente"} ${userProfile?.lastName || ""}`.trim();
 
+        const isB2B = userProfile?.type === "b2b";
+
         let totalAmount = 0;
         const detailedProducts = await Promise.all(
           products.map(async (p: any) => {
@@ -140,13 +142,19 @@ export default factories.createCoreController(
               "api::product.product",
               p.id,
             )) as any;
+
             if (!item) throw new Error(`Producto con ID ${p.id} no encontrado`);
-            totalAmount += Number(item.price) * (Number(p.quantity) || 1);
+
+            const priceToCharge =
+              isB2B && item.wholesalePrice ? item.wholesalePrice : item.price;
+
+            totalAmount += Number(priceToCharge) * (Number(p.quantity) || 1);
+
             return {
               id: item.id,
               documentId: item.documentId,
               name: item.productName,
-              price: item.price,
+              price: priceToCharge,
               quantity: Number(p.quantity) || 1,
             };
           }),
@@ -180,7 +188,7 @@ export default factories.createCoreController(
             subtotal: subtotal.toFixed(2),
             iva: iva.toFixed(2),
           },
-          redirect_url: `${process.env.FRONTEND_URL || "http://localhost:3000"}/success`,
+          redirect_url: `${process.env.CLIENT_URL || "http://localhost:3000"}/success`,
         };
 
         const response = await axios({
