@@ -146,7 +146,9 @@ export default factories.createCoreController(
             if (!item) throw new Error(`Producto con ID ${p.id} no encontrado`);
 
             const priceToCharge =
-              isB2B && item.wholesalePrice ? item.wholesalePrice : item.price;
+              isB2B && (item as any).wholesalePrice
+                ? (item as any).wholesalePrice
+                : (item as any).price;
 
             totalAmount += Number(priceToCharge) * (Number(p.quantity) || 1);
 
@@ -169,6 +171,8 @@ export default factories.createCoreController(
         const iva = totalAmount - subtotal;
 
         let checkoutSession: any;
+        const baseUrl =
+          process.env.CLIENT_URL || "https://www.refaccionesixoye.mx";
 
         const checkoutRequest = {
           amount: finalAmountStr,
@@ -188,7 +192,7 @@ export default factories.createCoreController(
             subtotal: subtotal.toFixed(2),
             iva: iva.toFixed(2),
           },
-          redirect_url: `${process.env.CLIENT_URL || "http://localhost:3000"}/success`,
+          redirect_url: `${baseUrl}/success`,
         };
 
         const response = await axios({
