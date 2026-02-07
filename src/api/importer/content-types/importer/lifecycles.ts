@@ -105,6 +105,22 @@ async function processExcelImport(result: any) {
     for (const row of dataRows as any[]) {
       const code = String(row["codigo"] || "").trim();
       const description = String(row["descripcion"] || "").trim();
+      const rawImages = row["images"] || row["imagen"] || "";
+      let imagesArray = [];
+
+      if (rawImages) {
+        try {
+          if (typeof rawImages === "string" && rawImages.startsWith("[")) {
+            imagesArray = JSON.parse(rawImages);
+          } else {
+            imagesArray = String(rawImages)
+              .split(",")
+              .map((img) => img.trim());
+          }
+        } catch (e) {
+          imagesArray = [String(rawImages).trim()];
+        }
+      }
 
       if (!code || !description) continue;
 
@@ -133,6 +149,7 @@ async function processExcelImport(result: any) {
         series: String(row["series"] || "").trim(),
         active: true,
         category: categoryId ? Number(categoryId) : null,
+        images: imagesArray,
       };
 
       const existingProduct = await strapi.db
