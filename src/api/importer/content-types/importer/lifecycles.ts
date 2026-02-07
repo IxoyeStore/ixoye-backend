@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import path from "path";
+import axios from "axios"; // Asegúrate de instalarlo: npm install axios
 
 const createBaseSlug = (name: string): string => {
   return name
@@ -59,8 +60,10 @@ export default {
 };
 
 async function processExcelImport(result: any) {
+  const identifier = result.documentId || result.id;
+
   const entry: any = await strapi.documents("api::importer.importer").findOne({
-    documentId: result.documentId,
+    documentId: identifier,
     populate: ["excelFile"],
   });
 
@@ -68,14 +71,28 @@ async function processExcelImport(result: any) {
 
   try {
     await strapi.documents("api::importer.importer").update({
-      documentId: result.documentId,
+      documentId: identifier,
       data: { fileStatus: "processing" },
     });
 
-    const filePath = path.join(process.cwd(), "public", entry.excelFile.url);
-    const workbook = XLSX.readFile(filePath);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const dataRows = XLSX.utils.sheet_to_json(worksheet);
+    let dataRows: any[] = [];
+    const fileUrl = entry.excelFile.url;
+
+    if (fileUrl.startsWith("http")) {
+      console.log(`🌐 Descargando archivo desde nube: ${fileUrl}`);
+      const response = await axios.get(fileUrl, {
+        responseType: "arraybuffer",
+      });
+      const workbook = XLSX.read(response.data, { type: "buffer" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      dataRows = XLSX.utils.sheet_to_json(worksheet);
+    } else {
+      const filePath = path.join(process.cwd(), "public", fileUrl);
+      console.log(`📂 Leyendo archivo local: ${filePath}`);
+      const workbook = XLSX.readFile(filePath);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      dataRows = XLSX.utils.sheet_to_json(worksheet);
+    }
 
     const defaultCategory = await strapi.db
       .query("api::category.category")
@@ -140,14 +157,14 @@ async function processExcelImport(result: any) {
     }
 
     await strapi.documents("api::importer.importer").update({
-      documentId: result.documentId,
+      documentId: identifier,
       data: { fileStatus: "completed" },
     });
     console.log(`✅ Importación exitosa: ${processedCount} productos.`);
   } catch (error) {
     console.error("❌ Error en el importador:", error);
     await strapi.documents("api::importer.importer").update({
-      documentId: result.documentId,
+      documentId: identifier,
       data: { fileStatus: "completed" },
     });
   }
