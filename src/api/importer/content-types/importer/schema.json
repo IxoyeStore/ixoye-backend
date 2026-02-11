@@ -14,20 +14,11 @@
     "excelFile": {
       "type": "media",
       "multiple": false,
-      "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
-      ]
+      "allowedTypes": ["images", "files", "videos", "audios"]
     },
     "fileStatus": {
       "type": "enumeration",
-      "enum": [
-        "pending",
-        "processing",
-        "completed"
-      ]
+      "enum": ["pending", "processing", "completed"]
     }
   }
 }

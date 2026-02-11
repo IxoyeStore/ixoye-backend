@@ -50,7 +50,7 @@ async function sendConfirmationEmail(
 
     await strapi.plugins["email"].services.email.send({
       to: order.email,
-      from: "ventas@ixoye-store.com",
+      from: "ecommerce@refaccionesixoye.mx",
       subject: `Confirmación de compra en Refacciones Ixoye - Orden #${order.id}`,
       html: `
         <div style="background-color: #f9f9f9; padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
