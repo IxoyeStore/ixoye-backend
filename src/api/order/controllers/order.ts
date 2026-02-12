@@ -6,7 +6,7 @@ import { factories } from "@strapi/strapi";
 const openpay = new Openpay(
   process.env.OPENPAY_MERCHANT_ID as string,
   process.env.OPENPAY_PRIVATE_KEY as string,
-  false, // false para Sandbox, true para Producción
+  true, // false para Sandbox, true para Produccion
 );
 
 async function sendConfirmationEmail(
@@ -197,7 +197,7 @@ export default factories.createCoreController(
 
         const response = await axios({
           method: "post",
-          url: `https://sandbox-api.openpay.mx/v1/${merchantId}/checkouts`,
+          url: `https://api.openpay.mx/v1/${merchantId}/checkouts`,
           data: checkoutRequest,
           headers: {
             Authorization: `Basic ${authHeader}`,
