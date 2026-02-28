@@ -655,6 +655,8 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     products: Schema.Attribute.JSON;
     publishedAt: Schema.Attribute.DateTime;
     shippingAddress: Schema.Attribute.JSON;
+    shippingLabel: Schema.Attribute.String;
+    shippingPrice: Schema.Attribute.Decimal;
     stripeId: Schema.Attribute.String;
     subtotal: Schema.Attribute.Decimal;
     total: Schema.Attribute.Decimal;
@@ -719,7 +721,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     department: Schema.Attribute.String;
     description: Schema.Attribute.Text;
     freeShipping: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
-    images: Schema.Attribute.Media<'images', true>;
+    images: Schema.Attribute.JSON;
     isFeatured: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<

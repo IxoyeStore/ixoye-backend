@@ -54,6 +54,12 @@
     },
     "iva": {
       "type": "decimal"
+    },
+    "shippingPrice": {
+      "type": "decimal"
+    },
+    "shippingLabel": {
+      "type": "string"
     }
   }
 }

@@ -67,6 +67,11 @@ async function sendConfirmationEmail(
               <div style="border: 1px solid #eee; border-radius: 10px; padding: 20px; margin: 20px 0;">
                 <h3 style="color: #0071b1; margin-top: 0;">Orden #${order.id}</h3>
                 ${productsList}
+                
+                <p style="text-align: right; font-size: 13px; color: #666; margin-bottom: 5px;">
+                  Envío: $${Number(order.shippingPrice || 0).toFixed(2)} MXN
+                </p>
+                
                 <p style="text-align: right; font-weight: bold; border-top: 2px solid #0071b1; padding-top: 10px;">
                   Total: $${Number(order.total).toFixed(2)} MXN
                 </p>
@@ -110,7 +115,20 @@ export default factories.createCoreController(
         const userSession = ctx.state.user;
         if (!userSession) return ctx.unauthorized("Sesión inválida.");
 
-        const { products, email, phone } = ctx.request.body?.data || {};
+        const {
+          products,
+          email,
+          phone,
+          shippingPrice,
+          shippingLabel,
+          shippingAddress,
+        } = ctx.request.body?.data || {};
+        const costOfShipping = Number(shippingPrice) || 0;
+
+        console.log("--- NUEVA ORDEN EN PROCESO ---");
+        console.log(`📦 Productos: ${products?.length}`);
+        console.log(`🚚 Envío: ${shippingLabel} ($${costOfShipping})`);
+        console.log(`📧 Email: ${email}`);
 
         if (!products || products.length === 0) {
           return ctx.badRequest("El carrito está vacío.");
@@ -162,13 +180,14 @@ export default factories.createCoreController(
           }),
         );
 
-        const finalAmountStr = totalAmount.toFixed(2);
         const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
         const merchantId = (process.env.OPENPAY_MERCHANT_ID || "").trim();
         const authHeader = Buffer.from(`${privateKey}:`).toString("base64");
         const uniqueOrderId = `ORD${Date.now()}`;
-        const subtotal = totalAmount / 1.16;
-        const iva = totalAmount - subtotal;
+        const finalTotalWithShipping = totalAmount + costOfShipping;
+        const finalAmountStr = finalTotalWithShipping.toFixed(2);
+        const subtotal = finalTotalWithShipping / 1.16;
+        const iva = finalTotalWithShipping - subtotal;
 
         let checkoutSession: any;
         const baseUrl =
@@ -191,6 +210,8 @@ export default factories.createCoreController(
           metadata: {
             subtotal: subtotal.toFixed(2),
             iva: iva.toFixed(2),
+            shipping: costOfShipping.toFixed(2),
+            shipping_label: shippingLabel || "Envío Estándar",
           },
           redirect_url: `${baseUrl}/success`,
         };
@@ -218,6 +239,9 @@ export default factories.createCoreController(
             phone: phoneToSave,
             total: parseFloat(finalAmountStr),
             subtotal: parseFloat(subtotal.toFixed(2)),
+            shippingPrice: costOfShipping,
+            shippingLabel:
+              ctx.request.body?.data?.shippingLabel || "Envío Estándar",
             iva: parseFloat(iva.toFixed(2)),
             orderStatus: "pending",
             user: userSession.id,
