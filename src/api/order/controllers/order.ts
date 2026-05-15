@@ -128,7 +128,7 @@ export default factories.createCoreController(
         console.log("--- NUEVA ORDEN EN PROCESO ---");
         console.log(`📦 Productos: ${products?.length}`);
         console.log(`🚚 Envío: ${shippingLabel} ($${costOfShipping})`);
-        console.log(`📧 Email: ${email}`);
+        console.log(`👤 Usuario: ${userSession.id}`);
 
         if (!products || products.length === 0) {
           return ctx.badRequest("El carrito está vacío.");
@@ -180,9 +180,16 @@ export default factories.createCoreController(
           }),
         );
 
-        const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
+        const getAuthHeader = () => {
+          const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
+          if (!privateKey) {
+            throw new Error("OPENPAY_PRIVATE_KEY no configurada");
+          }
+          return Buffer.from(`${privateKey}:`).toString("base64");
+        };
+
         const merchantId = (process.env.OPENPAY_MERCHANT_ID || "").trim();
-        const authHeader = Buffer.from(`${privateKey}:`).toString("base64");
+        const authHeader = getAuthHeader();
         const uniqueOrderId = `ORD${Date.now()}`;
         const finalTotalWithShipping = totalAmount + costOfShipping;
         const finalAmountStr = finalTotalWithShipping.toFixed(2);
@@ -255,7 +262,7 @@ export default factories.createCoreController(
       } catch (error: any) {
         console.error(
           "❌ ERROR EN CREATE:",
-          error.response?.data || error.message,
+          error.message || "Error desconocido",
         );
         return ctx.badRequest(error.message || "Error al procesar la orden");
       }

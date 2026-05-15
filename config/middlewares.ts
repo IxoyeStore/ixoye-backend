@@ -2,6 +2,18 @@ export default [
   "strapi::logger",
   "strapi::errors",
   {
+    name: "strapi::ratelimit",
+    config: {
+      enabled: true,
+      skipSuccessfulRequests: false,
+      skipFailedRequests: false,
+      keyGenerator: (ctx: any) => ctx.ip,
+      max: 100,
+      timeWindow: 60000, // 1 minuto
+      allowList: (ctx: any) => ["/health", "/metrics"].includes(ctx.path),
+    },
+  },
+  {
     name: "strapi::security",
     config: {
       contentSecurityPolicy: {

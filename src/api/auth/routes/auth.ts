@@ -1,4 +1,5 @@
-// src/api/auth/routes/auth.ts
+import { rateLimitMiddleware } from "../../../middlewares/ratelimit";
+
 export default {
   routes: [
     {
@@ -7,6 +8,9 @@ export default {
       handler: "api::auth.auth.customRegister",
       config: {
         auth: false,
+        middlewares: [
+          rateLimitMiddleware(5, 60 * 1000), // 5 intentos por minuto
+        ],
       },
     },
   ],
