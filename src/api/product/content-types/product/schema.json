@@ -68,6 +68,10 @@
     "series": {
       "type": "string"
     },
+    "oemCode": {
+      "type": "string",
+      "required": false
+    },
     "isFeatured": {
       "type": "boolean",
       "default": false
