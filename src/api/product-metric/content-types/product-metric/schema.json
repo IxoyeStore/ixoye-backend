@@ -26,6 +26,14 @@
     "purchases": {
       "type": "integer",
       "default": 0
+    },
+    "searchImpressions": {
+      "type": "integer",
+      "default": 0
+    },
+    "categoryImpressions": {
+      "type": "integer",
+      "default": 0
     }
   }
 }

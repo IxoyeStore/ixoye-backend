@@ -765,9 +765,11 @@ export interface ApiProductMetricProductMetric extends Struct.CollectionTypeSche
       'api::product-metric.product-metric'
     > &
       Schema.Attribute.Private;
+    categoryImpressions: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     productId: Schema.Attribute.Integer & Schema.Attribute.Required;
     purchases: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
+    searchImpressions: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
