@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "product_metrics",
+  "info": {
+    "singularName": "product-metric",
+    "pluralName": "product-metrics",
+    "displayName": "Product Metric"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "productId": {
+      "type": "integer",
+      "required": true
+    },
+    "views": {
+      "type": "integer",
+      "default": 0
+    },
+    "cartAdds": {
+      "type": "integer",
+      "default": 0
+    },
+    "purchases": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}
