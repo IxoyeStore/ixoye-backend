@@ -100,57 +100,76 @@ async function processExcelImport(result: any) {
         where: { categoryName: "Sin Clasificar" },
       });
 
+    // Helper: read a field trying multiple possible column name variants
+    const col = (row: any, ...keys: string[]): any => {
+      for (const k of keys) {
+        if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+      }
+      return undefined;
+    };
+
     let processedCount = 0;
 
     for (const row of dataRows as any[]) {
-      const code = String(row["codigo"] || "").trim();
-      const description = String(row["descripcion"] || "").trim();
-      const rawImages = row["images"] || row["imagen"] || "";
-      let imagesArray = [];
+      // Accept both original lowercase keys AND bulk-editor Spanish label keys
+      const code        = String(col(row, "codigo",       "Código",          "CODIGO")        || "").trim();
+      const description = String(col(row, "descripcion",  "Nombre",          "DESCRIPCION",
+                                        "nombre",         "productName")     || "").trim();
+      const rawImages   = col(row, "images", "imagen", "Imagenes") || "";
+      let imagesArray: string[] = [];
 
       if (rawImages) {
         try {
           if (typeof rawImages === "string" && rawImages.startsWith("[")) {
             imagesArray = JSON.parse(rawImages);
           } else {
-            imagesArray = String(rawImages)
-              .split(",")
-              .map((img) => img.trim());
+            imagesArray = String(rawImages).split(",").map((img: string) => img.trim());
           }
-        } catch (e) {
+        } catch {
           imagesArray = [String(rawImages).trim()];
         }
       }
 
       if (!code || !description) continue;
 
+      const categoryName = String(col(row, "categoria", "Categoría", "categoria") || "").trim();
       let categoryId = null;
-      if (row["categoria"]) {
+      if (categoryName) {
         const foundCategory = await strapi.db
           .query("api::category.category")
-          .findOne({
-            where: { categoryName: String(row["categoria"]).trim() },
-          });
+          .findOne({ where: { categoryName } });
         if (foundCategory) categoryId = foundCategory.id;
       }
       if (!categoryId && defaultCategory) categoryId = defaultCategory.id;
 
+      const rawPrice          = col(row, "precio",          "Precio Público",  "precio_publico", "PRECIO");
+      const rawWholesalePrice = col(row, "precioMayoreo",   "Precio Mayoreo",  "precio_mayoreo");
+      const rawStock          = col(row, "stock",           "Stock",           "STOCK");
+      const rawDept           = col(row, "departamento",    "Departamento",    "DEPARTAMENTO");
+      const rawSubDept        = col(row, "subDepartamento", "Sub-Departamento","SUB_DEPARTAMENTO");
+      const rawType           = col(row, "tipoProducto",    "Tipo",            "TIPO");
+      const rawBrand          = col(row, "marca",           "Marca",           "brand", "MARCA");
+      const rawSeries         = col(row, "series",          "Series",          "SERIES");
+
       const productPayload: any = {
         productName: description,
         description: description,
-        price: cleanNumber(row["precio"]),
-        wholesalePrice: cleanNumber(row["precioMayoreo"]),
-        stock: Math.floor(cleanNumber(row["stock"] || 0)),
-        code: code,
-        department: String(row["departamento"] || "").trim(),
-        subDepartment: String(row["subDepartamento"] || "").trim(),
-        productType: String(row["tipoProducto"] || "").trim(),
-        brand: String(row["marca"] || row["brand"] || "").trim(),
-        series: String(row["series"] || "").trim(),
+        price:          cleanNumber(rawPrice ?? 0),
+        wholesalePrice: rawWholesalePrice !== undefined ? cleanNumber(rawWholesalePrice) : undefined,
+        stock:          Math.floor(cleanNumber(rawStock ?? 0)),
+        code,
+        department:    String(rawDept    || "").trim(),
+        subDepartment: String(rawSubDept || "").trim(),
+        productType:   String(rawType    || "").trim(),
+        brand:         String(rawBrand   || "").trim(),
+        series:        String(rawSeries  || "").trim(),
         active: true,
         category: categoryId ? Number(categoryId) : null,
         images: imagesArray,
       };
+
+      // Remove undefined optional fields to avoid overwriting with null
+      if (productPayload.wholesalePrice === undefined) delete productPayload.wholesalePrice;
 
       const existingProduct = await strapi.db
         .query("api::product.product")
