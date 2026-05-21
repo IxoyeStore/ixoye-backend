@@ -142,18 +142,27 @@ async function processExcelImport(result: any) {
       }
       if (!categoryId && defaultCategory) categoryId = defaultCategory.id;
 
-      const rawPrice          = col(row, "precio",          "Precio Público",  "precio_publico", "PRECIO");
+      const rawPrice          = col(row, "precio",          "Precio Público",  "precio_publico");
       const rawWholesalePrice = col(row, "precioMayoreo",   "Precio Mayoreo",  "precio_mayoreo");
-      const rawStock          = col(row, "stock",           "Stock",           "STOCK");
-      const rawDept           = col(row, "departamento",    "Departamento",    "DEPARTAMENTO");
-      const rawSubDept        = col(row, "subDepartamento", "Sub-Departamento","SUB_DEPARTAMENTO");
-      const rawType           = col(row, "tipoProducto",    "Tipo",            "TIPO");
-      const rawBrand          = col(row, "marca",           "Marca",           "brand", "MARCA");
-      const rawSeries         = col(row, "series",          "Series",          "SERIES");
+      const rawStock          = col(row, "stock",           "Stock");
+      const rawDept           = col(row, "departamento",    "Departamento");
+      const rawSubDept        = col(row, "subDepartamento", "Sub-Departamento");
+      const rawType           = col(row, "tipoProducto",    "Tipo");
+      const rawBrand          = col(row, "marca",           "Marca",           "brand");
+      const rawSeries         = col(row, "series",          "Series");
+      const rawActive         = col(row, "activo",          "Activo (TRUE/FALSE)");
+      const rawFeatured       = col(row, "destacado",       "Destacado (TRUE/FALSE)");
+      const rawShipping       = col(row, "envioGratis",     "Envio Gratis (TRUE/FALSE)");
+      const rawDescLarga      = col(row, "descripcionLarga","Descripción");
+
+      const parseBool = (v: any): boolean | undefined => {
+        if (v === undefined || v === null || v === "") return undefined;
+        return String(v).toUpperCase() === "TRUE";
+      };
 
       const productPayload: any = {
         productName: description,
-        description: description,
+        description: rawDescLarga ? String(rawDescLarga).trim() : description,
         price:          cleanNumber(rawPrice ?? 0),
         wholesalePrice: rawWholesalePrice !== undefined ? cleanNumber(rawWholesalePrice) : undefined,
         stock:          Math.floor(cleanNumber(rawStock ?? 0)),
@@ -163,13 +172,17 @@ async function processExcelImport(result: any) {
         productType:   String(rawType    || "").trim(),
         brand:         String(rawBrand   || "").trim(),
         series:        String(rawSeries  || "").trim(),
-        active: true,
+        active:      parseBool(rawActive)    ?? true,
+        isFeatured:  parseBool(rawFeatured)  ?? undefined,
+        freeShipping: parseBool(rawShipping) ?? undefined,
         category: categoryId ? Number(categoryId) : null,
         images: imagesArray,
       };
 
-      // Remove undefined optional fields to avoid overwriting with null
+      // Remove undefined optional fields to avoid overwriting existing values
       if (productPayload.wholesalePrice === undefined) delete productPayload.wholesalePrice;
+      if (productPayload.isFeatured     === undefined) delete productPayload.isFeatured;
+      if (productPayload.freeShipping   === undefined) delete productPayload.freeShipping;
 
       const existingProduct = await strapi.db
         .query("api::product.product")
