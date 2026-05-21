@@ -744,6 +744,37 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiProductMetricProductMetric extends Struct.CollectionTypeSchema {
+  collectionName: 'product_metrics';
+  info: {
+    displayName: 'Product Metric';
+    pluralName: 'product-metrics';
+    singularName: 'product-metric';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    cartAdds: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::product-metric.product-metric'
+    > &
+      Schema.Attribute.Private;
+    productId: Schema.Attribute.Integer & Schema.Attribute.Required;
+    purchases: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    views: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+  };
+}
+
 export interface ApiProfileProfile extends Struct.CollectionTypeSchema {
   collectionName: 'profiles';
   info: {
@@ -1375,6 +1406,7 @@ declare module '@strapi/strapi' {
       'api::importer.importer': ApiImporterImporter;
       'api::order.order': ApiOrderOrder;
       'api::privacy-policy.privacy-policy': ApiPrivacyPolicyPrivacyPolicy;
+      'api::product-metric.product-metric': ApiProductMetricProductMetric;
       'api::product.product': ApiProductProduct;
       'api::profile.profile': ApiProfileProfile;
       'api::shipment.shipment': ApiShipmentShipment;
