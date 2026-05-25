@@ -612,7 +612,7 @@ export interface ApiImporterImporter extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     excelFile: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     fileStatus: Schema.Attribute.Enumeration<
-      ['pending', 'processing', 'completed']
+      ['pending', 'processing', 'completed', 'error']
     >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<

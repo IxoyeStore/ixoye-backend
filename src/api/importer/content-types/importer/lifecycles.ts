@@ -184,11 +184,13 @@ async function processExcelImport(result: any) {
       if (productPayload.isFeatured     === undefined) delete productPayload.isFeatured;
       if (productPayload.freeShipping   === undefined) delete productPayload.freeShipping;
 
-      const existingProduct = await strapi.db
-        .query("api::product.product")
-        .findOne({ where: { code: code } });
+      const existingResults = await strapi.documents("api::product.product").findMany({
+        filters: { code: { $eq: code } },
+        limit: 1,
+      });
+      const existingProduct = existingResults?.[0] ?? null;
 
-      if (existingProduct) {
+      if (existingProduct?.documentId) {
         await strapi.documents("api::product.product").update({
           documentId: existingProduct.documentId,
           data: productPayload,
@@ -210,11 +212,12 @@ async function processExcelImport(result: any) {
       data: { fileStatus: "completed" },
     });
     console.log(`✅ Importación exitosa: ${processedCount} productos.`);
-  } catch (error) {
-    console.error("❌ Error en el importador:", error);
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    console.error("❌ Error en el importador:", msg);
     await strapi.documents("api::importer.importer").update({
       documentId: identifier,
-      data: { fileStatus: "completed" },
+      data: { fileStatus: "error" },
     });
   }
 }
