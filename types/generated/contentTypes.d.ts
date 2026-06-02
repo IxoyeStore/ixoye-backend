@@ -698,6 +698,41 @@ export interface ApiPrivacyPolicyPrivacyPolicy extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiProductMetricProductMetric
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'product_metrics';
+  info: {
+    displayName: 'Product Metric';
+    pluralName: 'product-metrics';
+    singularName: 'product-metric';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    cartAdds: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    categoryImpressions: Schema.Attribute.Integer &
+      Schema.Attribute.DefaultTo<0>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::product-metric.product-metric'
+    > &
+      Schema.Attribute.Private;
+    productId: Schema.Attribute.Integer & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    purchases: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    searchImpressions: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    views: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+  };
+}
+
 export interface ApiProductProduct extends Struct.CollectionTypeSchema {
   collectionName: 'products';
   info: {
@@ -729,6 +764,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
       'api::product.product'
     > &
       Schema.Attribute.Private;
+    oemCode: Schema.Attribute.String;
     price: Schema.Attribute.Decimal & Schema.Attribute.Required;
     productName: Schema.Attribute.String & Schema.Attribute.Required;
     productType: Schema.Attribute.String;
@@ -741,39 +777,6 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     wholesalePrice: Schema.Attribute.Decimal;
-  };
-}
-
-export interface ApiProductMetricProductMetric extends Struct.CollectionTypeSchema {
-  collectionName: 'product_metrics';
-  info: {
-    displayName: 'Product Metric';
-    pluralName: 'product-metrics';
-    singularName: 'product-metric';
-  };
-  options: {
-    draftAndPublish: false;
-  };
-  attributes: {
-    cartAdds: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::product-metric.product-metric'
-    > &
-      Schema.Attribute.Private;
-    categoryImpressions: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
-    productId: Schema.Attribute.Integer & Schema.Attribute.Required;
-    purchases: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
-    publishedAt: Schema.Attribute.DateTime;
-    searchImpressions: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    views: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
   };
 }
 
