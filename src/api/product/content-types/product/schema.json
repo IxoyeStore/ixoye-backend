@@ -68,6 +68,9 @@
     "series": {
       "type": "string"
     },
+    "motors": {
+      "type": "string"
+    },
     "oemCode": {
       "type": "string",
       "required": false
