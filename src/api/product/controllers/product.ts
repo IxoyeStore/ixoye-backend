@@ -7,12 +7,23 @@ import { factories } from '@strapi/strapi';
 export default factories.createCoreController('api::product.product', ({ strapi }) => ({
   // Diagnostic: exposes the resolved join-table info for the `category` relation.
   async relationInfo(ctx) {
-    const meta = strapi.db.metadata.get('api::product.product');
-    const attr: any = meta.attributes.category;
-    ctx.body = {
-      productsTable: meta.tableName,
-      relationAttribute: attr,
-    };
+    try {
+      const meta = strapi.db.metadata.get('api::product.product');
+      const attr: any = meta.attributes.category;
+      const subDeptAttr: any = meta.attributes.subDepartment;
+      ctx.body = {
+        productsTable: meta.tableName,
+        relationType: attr?.relation,
+        hasJoinTable: !!attr?.joinTable,
+        joinTableName: attr?.joinTable?.name ?? null,
+        joinColumnName: attr?.joinTable?.joinColumn?.name ?? null,
+        inverseJoinColumnName: attr?.joinTable?.inverseJoinColumn?.name ?? null,
+        joinColumnDirect: attr?.joinColumn?.name ?? null,
+        subDeptColumnName: subDeptAttr?.columnName ?? null,
+      };
+    } catch (e: any) {
+      ctx.body = { error: e.message, stack: e.stack };
+    }
   },
 
   // One-off bulk assignment: sets `category` for every product in a subDepartment,
@@ -23,20 +34,25 @@ export default factories.createCoreController('api::product.product', ({ strapi 
       return ctx.badRequest('Body must be { "mapping": { "<subDepartment>": categoryId, ... } }');
     }
 
-    const meta = strapi.db.metadata.get('api::product.product');
-    const attr: any = meta.attributes.category;
-    const joinTable = attr.joinTable;
-    if (!joinTable) {
-      return ctx.internalServerError('category relation has no joinTable metadata');
-    }
-    const subDeptAttr: any = meta.attributes.subDepartment;
-    const subDeptCol = subDeptAttr.columnName || 'sub_department';
+    let meta, attr, joinTable, subDeptCol, knex, linkTable, productCol, categoryCol, productsTable;
+    try {
+      meta = strapi.db.metadata.get('api::product.product');
+      attr = meta.attributes.category as any;
+      joinTable = attr.joinTable;
+      if (!joinTable) {
+        return ctx.internalServerError('category relation has no joinTable metadata (may be a direct joinColumn instead)');
+      }
+      const subDeptAttr: any = meta.attributes.subDepartment;
+      subDeptCol = subDeptAttr.columnName || 'sub_department';
 
-    const knex = strapi.db.connection;
-    const linkTable = joinTable.name;
-    const productCol = joinTable.joinColumn.name; // FK -> products.id
-    const categoryCol = joinTable.inverseJoinColumn.name; // FK -> categories.id
-    const productsTable = meta.tableName;
+      knex = strapi.db.connection;
+      linkTable = joinTable.name;
+      productCol = joinTable.joinColumn.name; // FK -> products.id
+      categoryCol = joinTable.inverseJoinColumn.name; // FK -> categories.id
+      productsTable = meta.tableName;
+    } catch (e: any) {
+      return ctx.body = { setupError: e.message };
+    }
 
     const results = [];
     for (const [subDepartment, categoryIdRaw] of Object.entries(mapping)) {
