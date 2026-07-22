@@ -151,6 +151,7 @@ async function processExcelImport(result: any) {
       const rawBrand          = col(row, "marca",           "Marca",           "brand");
       const rawSeries         = col(row, "series",          "Series");
       const rawMotors         = col(row, "motores",         "Motores");
+      const rawImageCode      = col(row, "codigoImagen",    "Código Imagen");
       const rawActive         = col(row, "activo",          "Activo (TRUE/FALSE)");
       const rawFeatured       = col(row, "destacado",       "Destacado (TRUE/FALSE)");
       const rawShipping       = col(row, "envioGratis",     "Envio Gratis (TRUE/FALSE)");
@@ -174,6 +175,7 @@ async function processExcelImport(result: any) {
         brand:         String(rawBrand   || "").trim(),
         series:        String(rawSeries  || "").trim(),
         motors:        String(rawMotors  || "").trim(),
+        imageCode:     String(rawImageCode || "").trim(),
         active:      parseBool(rawActive)    ?? true,
         isFeatured:  parseBool(rawFeatured)  ?? undefined,
         freeShipping: parseBool(rawShipping) ?? undefined,

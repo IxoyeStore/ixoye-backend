@@ -75,6 +75,10 @@
       "type": "string",
       "required": false
     },
+    "imageCode": {
+      "type": "string",
+      "required": false
+    },
     "isFeatured": {
       "type": "boolean",
       "default": false
