@@ -123,7 +123,7 @@ export default factories.createCoreController(
           shippingLabel,
           shippingAddress,
         } = ctx.request.body?.data || {};
-        const costOfShipping = Number(shippingPrice) || 0;
+        const costOfShipping = Math.max(0, Number(shippingPrice) || 0);
 
         console.log("--- NUEVA ORDEN EN PROCESO ---");
         console.log(`📦 Productos: ${products?.length}`);
