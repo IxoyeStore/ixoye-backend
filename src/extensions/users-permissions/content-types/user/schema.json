@@ -77,6 +77,12 @@
       "relation": "oneToMany",
       "target": "api::address.address",
       "mappedBy": "users_permissions_user"
+    },
+    "questions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::question.question",
+      "mappedBy": "user"
     }
   }
 }

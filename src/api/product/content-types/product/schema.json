@@ -90,6 +90,12 @@
     "freeShipping": {
       "type": "boolean",
       "default": false
+    },
+    "questions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::question.question",
+      "mappedBy": "product"
     }
   }
 }
