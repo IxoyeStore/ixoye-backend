@@ -174,6 +174,8 @@ export default factories.createCoreController(
               id: item.id,
               documentId: item.documentId,
               name: item.productName,
+              code: item.code,
+              image: Array.isArray(item.images) ? item.images[0] : null,
               price: priceToCharge,
               quantity: Number(p.quantity) || 1,
             };
