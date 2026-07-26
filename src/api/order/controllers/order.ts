@@ -107,6 +107,73 @@ async function sendConfirmationEmail(
   }
 }
 
+// Traduce el objeto "transaction" que manda Openpay en el webhook a los
+// campos que guardamos en la orden. Openpay soporta varios metodos de pago
+// (tarjeta, transferencia SPEI, pago en tienda/servicios) y cada uno trae
+// informacion distinta, por eso se arma un label legible ademas de guardar
+// marca/tipo/terminacion cuando aplica (solo tarjeta las tiene).
+function extractPaymentInfo(transaction: any): {
+  paymentMethod: string;
+  cardBrand: string | null;
+  cardType: "debito" | "credito" | null;
+  cardLast4: string | null;
+} {
+  const method = transaction?.method || transaction?.payment_method?.type;
+
+  if (method === "card" && transaction?.card) {
+    const rawBrand = String(transaction.card.brand || "").trim();
+    const brand = rawBrand
+      ? rawBrand.charAt(0).toUpperCase() + rawBrand.slice(1)
+      : "Tarjeta";
+    const cardType: "debito" | "credito" | null =
+      transaction.card.type === "debit"
+        ? "debito"
+        : transaction.card.type === "credit"
+          ? "credito"
+          : null;
+    const typeLabel = cardType === "debito" ? "Débito" : cardType === "credito" ? "Crédito" : "";
+    const cardNumber = String(transaction.card.card_number || "");
+    const last4 = cardNumber.slice(-4) || null;
+
+    return {
+      paymentMethod: `${typeLabel} ${brand}`.trim(),
+      cardBrand: rawBrand || null,
+      cardType,
+      cardLast4: last4,
+    };
+  }
+
+  if (method === "bank_account") {
+    return {
+      paymentMethod: "Transferencia interbancaria (SPEI)",
+      cardBrand: null,
+      cardType: null,
+      cardLast4: null,
+    };
+  }
+
+  if (method === "store") {
+    const provider = String(
+      transaction?.payment_method?.provider ||
+        transaction?.store?.provider ||
+        transaction?.payment_method?.type ||
+        "",
+    ).toLowerCase();
+    const paymentMethod = provider.includes("bbva")
+      ? "Pago de servicios BBVA"
+      : "Pago en tienda";
+
+    return { paymentMethod, cardBrand: null, cardType: null, cardLast4: null };
+  }
+
+  return {
+    paymentMethod: "No especificado",
+    cardBrand: null,
+    cardType: null,
+    cardLast4: null,
+  };
+}
+
 export default factories.createCoreController(
   "api::order.order",
   ({ strapi }) => ({
@@ -311,11 +378,12 @@ export default factories.createCoreController(
           }
 
           if (order.orderStatus !== "paid") {
+            const paymentInfo = extractPaymentInfo(transaction);
             const updatedOrder = await strapi
               .documents("api::order.order")
               .update({
                 documentId: order.documentId,
-                data: { orderStatus: "paid" },
+                data: { orderStatus: "paid", ...paymentInfo },
               });
 
             console.log(`✅ Orden ${order.documentId} marcada como PAGADA`);

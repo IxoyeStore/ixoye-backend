@@ -60,6 +60,22 @@
     },
     "shippingLabel": {
       "type": "string"
+    },
+    "paymentMethod": {
+      "type": "string"
+    },
+    "cardBrand": {
+      "type": "string"
+    },
+    "cardType": {
+      "type": "enumeration",
+      "enum": [
+        "debito",
+        "credito"
+      ]
+    },
+    "cardLast4": {
+      "type": "string"
     }
   }
 }
