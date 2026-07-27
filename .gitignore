@@ -134,4 +134,4 @@ build
 # Claude Code (local)
 ############################
 
-.claude/settings.local.json
+.claude/
