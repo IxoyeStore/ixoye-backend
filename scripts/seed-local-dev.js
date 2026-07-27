@@ -23,6 +23,10 @@ const ADMIN_EMAIL = "tienda_admin@test.local";
 const ADMIN_USERNAME = "tienda_admin";
 const ADMIN_PASSWORD = "AdminPrueba123!";
 
+const CUSTOMER_EMAIL = "cliente_prueba2@test.local";
+const CUSTOMER_USERNAME = "cliente_prueba2";
+const CUSTOMER_PASSWORD = "ClientePrueba123!";
+
 const ADMIN_PERMISSIONS = [
   "api::product.product.find",
   "api::product.product.findOne",
@@ -39,6 +43,20 @@ const ADMIN_PERMISSIONS = [
   "plugin::users-permissions.user.me",
   "plugin::users-permissions.role.find",
   "plugin::users-permissions.role.findOne",
+];
+
+// Lo que un cliente real puede hacer: ver catalogo, crear/editar sus
+// direcciones y poner una orden. Necesario para probar el flujo de
+// checkout (validaciones de direccion/envio/stock) sin admin.
+const AUTHENTICATED_PERMISSIONS = [
+  "api::product.product.find",
+  "api::product.product.findOne",
+  "api::category.category.find",
+  "api::category.category.findOne",
+  "api::address.address.find",
+  "api::address.address.create",
+  "api::address.address.update",
+  "api::order.order.create",
 ];
 
 const DEMO_PRODUCTS = [
@@ -62,37 +80,15 @@ function slugify(name) {
     .replace(/(^-|-$)/g, "");
 }
 
-function ensureAdminUser() {
+function grantPermissions(roleType, actions) {
   const now = Date.now();
-  const adminRole = db.prepare("SELECT id FROM up_roles WHERE type = 'admin'").get();
-  if (!adminRole) {
-    console.error("No existe el rol 'Admin' (type=admin) en up_roles. Corre `strapi develop` una vez primero para que Strapi inicialice las tablas.");
+  const role = db.prepare("SELECT id FROM up_roles WHERE type = ?").get(roleType);
+  if (!role) {
+    console.error(`No existe el rol '${roleType}' en up_roles. Corre \`strapi develop\` una vez primero para que Strapi inicialice las tablas.`);
     process.exit(1);
   }
 
-  let user = db.prepare("SELECT id FROM up_users WHERE email = ?").get(ADMIN_EMAIL);
-  const passwordHash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
-
-  if (!user) {
-    const info = db.prepare(`
-      INSERT INTO up_users (document_id, username, email, provider, password, confirmed, blocked, created_at, updated_at, published_at)
-      VALUES (?, ?, ?, 'local', ?, 1, 0, ?, ?, ?)
-    `).run(docId(), ADMIN_USERNAME, ADMIN_EMAIL, passwordHash, now, now, now);
-    user = { id: info.lastInsertRowid };
-    console.log(`Usuario admin creado: ${ADMIN_EMAIL}`);
-  } else {
-    db.prepare("UPDATE up_users SET password = ? WHERE id = ?").run(passwordHash, user.id);
-    console.log(`Usuario admin ya existia, password reseteada: ${ADMIN_EMAIL}`);
-  }
-
-  const linked = db.prepare("SELECT id FROM up_users_role_lnk WHERE user_id = ?").get(user.id);
-  if (!linked) {
-    db.prepare("INSERT INTO up_users_role_lnk (user_id, role_id, user_ord) VALUES (?, ?, 1)").run(user.id, adminRole.id);
-  } else {
-    db.prepare("UPDATE up_users_role_lnk SET role_id = ? WHERE user_id = ?").run(adminRole.id, user.id);
-  }
-
-  const maxOrd = db.prepare("SELECT MAX(permission_ord) as m FROM up_permissions_role_lnk WHERE role_id = ?").get(adminRole.id).m || 0;
+  const maxOrd = db.prepare("SELECT MAX(permission_ord) as m FROM up_permissions_role_lnk WHERE role_id = ?").get(role.id).m || 0;
   const insertPerm = db.prepare(`
     INSERT INTO up_permissions (document_id, action, created_at, updated_at, published_at)
     VALUES (?, ?, ?, ?, ?)
@@ -100,19 +96,47 @@ function ensureAdminUser() {
   const insertLnk = db.prepare("INSERT INTO up_permissions_role_lnk (permission_id, role_id, permission_ord) VALUES (?, ?, ?)");
 
   let ord = maxOrd;
-  for (const action of ADMIN_PERMISSIONS) {
+  for (const action of actions) {
     let perm = db.prepare("SELECT id FROM up_permissions WHERE action = ?").get(action);
     if (!perm) {
       const info = insertPerm.run(docId(), action, now, now, now);
       perm = { id: info.lastInsertRowid };
     }
-    const alreadyLinked = db.prepare("SELECT id FROM up_permissions_role_lnk WHERE permission_id = ? AND role_id = ?").get(perm.id, adminRole.id);
+    const alreadyLinked = db.prepare("SELECT id FROM up_permissions_role_lnk WHERE permission_id = ? AND role_id = ?").get(perm.id, role.id);
     if (!alreadyLinked) {
       ord += 1;
-      insertLnk.run(perm.id, adminRole.id, ord);
+      insertLnk.run(perm.id, role.id, ord);
     }
   }
-  console.log(`Permisos del rol Admin verificados (${ADMIN_PERMISSIONS.length} acciones).`);
+  console.log(`Permisos del rol '${roleType}' verificados (${actions.length} acciones).`);
+  return role;
+}
+
+function ensureUser({ email, username, password, roleId }) {
+  const now = Date.now();
+  let user = db.prepare("SELECT id FROM up_users WHERE email = ?").get(email);
+  const passwordHash = bcrypt.hashSync(password, 10);
+
+  if (!user) {
+    const info = db.prepare(`
+      INSERT INTO up_users (document_id, username, email, provider, password, confirmed, blocked, created_at, updated_at, published_at)
+      VALUES (?, ?, ?, 'local', ?, 1, 0, ?, ?, ?)
+    `).run(docId(), username, email, passwordHash, now, now, now);
+    user = { id: info.lastInsertRowid };
+    console.log(`Usuario creado: ${email}`);
+  } else {
+    db.prepare("UPDATE up_users SET password = ? WHERE id = ?").run(passwordHash, user.id);
+    console.log(`Usuario ya existia, password reseteada: ${email}`);
+  }
+
+  const linked = db.prepare("SELECT id FROM up_users_role_lnk WHERE user_id = ?").get(user.id);
+  if (!linked) {
+    db.prepare("INSERT INTO up_users_role_lnk (user_id, role_id, user_ord) VALUES (?, ?, 1)").run(user.id, roleId);
+  } else {
+    db.prepare("UPDATE up_users_role_lnk SET role_id = ? WHERE user_id = ?").run(roleId, user.id);
+  }
+
+  return user;
 }
 
 function ensureDemoProducts() {
@@ -149,10 +173,18 @@ function ensureDemoProducts() {
   }
 }
 
-ensureAdminUser();
+const adminRole = grantPermissions("admin", ADMIN_PERMISSIONS);
+ensureUser({ email: ADMIN_EMAIL, username: ADMIN_USERNAME, password: ADMIN_PASSWORD, roleId: adminRole.id });
+
+const authenticatedRole = grantPermissions("authenticated", AUTHENTICATED_PERMISSIONS);
+ensureUser({ email: CUSTOMER_EMAIL, username: CUSTOMER_USERNAME, password: CUSTOMER_PASSWORD, roleId: authenticatedRole.id });
+
 ensureDemoProducts();
 db.close();
 
-console.log("\nListo. Entra con:");
+console.log("\nListo. Entra como admin con:");
 console.log(`  Email:    ${ADMIN_EMAIL}`);
 console.log(`  Password: ${ADMIN_PASSWORD}`);
+console.log("\nO como cliente de prueba (para probar checkout) con:");
+console.log(`  Email:    ${CUSTOMER_EMAIL}`);
+console.log(`  Password: ${CUSTOMER_PASSWORD}`);

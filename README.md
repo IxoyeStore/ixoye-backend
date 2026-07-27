@@ -15,6 +15,11 @@ Credenciales del admin de prueba (para el login del frontend en `/login`):
 - Email: `tienda_admin@test.local`
 - Password: `AdminPrueba123!`
 
+Credenciales de un cliente de prueba normal (para probar checkout/pedidos):
+
+- Email: `cliente_prueba2@test.local`
+- Password: `ClientePrueba123!`
+
 `npm run seed:local` es idempotente — córrelo cuando quieras (por ejemplo
 si borras `.tmp/local-dev.db` para empezar de cero) y deja todo en el mismo
 estado sin duplicar productos ni usuarios.

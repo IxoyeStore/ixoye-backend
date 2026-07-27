@@ -1,13 +1,76 @@
 "use strict";
+import fs from "fs";
+import path from "path";
 import axios from "axios";
 import Openpay from "openpay";
 import { factories } from "@strapi/strapi";
+
+// Mismo dataset de CP que usa el frontend para cotizar el envio. Se carga
+// una sola vez al iniciar el servidor (no por request).
+const cpMexico: Record<string, { e: string; m: string; c?: string[] }> =
+  JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "data", "cp-mexico.json"), "utf-8"),
+  );
+
+// Replica la logica de app/(routes)/cart/page.tsx del lado del servidor.
+// Nunca hay que confiar en el shippingPrice que manda el cliente: se
+// recalcula aqui a partir del CP guardado en la direccion del usuario.
+function calculateShippingServerSide(
+  postalCode: string | null | undefined,
+): { cost: number; label: string } {
+  if (!postalCode || postalCode.length !== 5) {
+    return { cost: -1, label: "No disponible" };
+  }
+  const entry = cpMexico[postalCode];
+  if (!entry) {
+    return { cost: 250, label: "Envío Nacional" };
+  }
+  if (entry.e !== "Nayarit") {
+    return { cost: -1, label: "No disponible" };
+  }
+  return { cost: 0, label: "Entrega Local" };
+}
 
 const openpay = new Openpay(
   process.env.OPENPAY_MERCHANT_ID as string,
   process.env.OPENPAY_PRIVATE_KEY as string,
   true, // false para Sandbox, true para Produccion
 );
+
+function getOpenpayAuthHeader(): string {
+  const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
+  if (!privateKey) {
+    throw new Error("OPENPAY_PRIVATE_KEY no configurada");
+  }
+  return Buffer.from(`${privateKey}:`).toString("base64");
+}
+
+function getOpenpayMerchantId(): string {
+  return (process.env.OPENPAY_MERCHANT_ID || "").trim();
+}
+
+// Nunca confiar en el cuerpo del webhook por si solo: cualquiera puede
+// mandar un POST falso a este endpoint (es publico, Openpay lo requiere
+// asi). Antes de marcar una orden como pagada, se verifica la transaccion
+// consultando directamente la API de Openpay con la llave privada del
+// servidor, que es el unico dato que un atacante no puede falsificar.
+async function verifyOpenpayCharge(chargeId: string): Promise<any | null> {
+  try {
+    const merchantId = getOpenpayMerchantId();
+    const authHeader = getOpenpayAuthHeader();
+    const res = await axios.get(
+      `https://api.openpay.mx/v1/${merchantId}/charges/${chargeId}`,
+      { headers: { Authorization: `Basic ${authHeader}` } },
+    );
+    return res.data;
+  } catch (err: any) {
+    console.error(
+      "❌ No se pudo verificar la transaccion con Openpay:",
+      err.response?.data || err.message,
+    );
+    return null;
+  }
+}
 
 async function sendConfirmationEmail(
   strapi: any,
@@ -182,19 +245,10 @@ export default factories.createCoreController(
         const userSession = ctx.state.user;
         if (!userSession) return ctx.unauthorized("Sesión inválida.");
 
-        const {
-          products,
-          email,
-          phone,
-          shippingPrice,
-          shippingLabel,
-          shippingAddress,
-        } = ctx.request.body?.data || {};
-        const costOfShipping = Math.max(0, Number(shippingPrice) || 0);
+        const { products, email, phone } = ctx.request.body?.data || {};
 
         console.log("--- NUEVA ORDEN EN PROCESO ---");
         console.log(`📦 Productos: ${products?.length}`);
-        console.log(`🚚 Envío: ${shippingLabel} ($${costOfShipping})`);
         console.log(`👤 Usuario: ${userSession.id}`);
 
         if (!products || products.length === 0) {
@@ -215,6 +269,23 @@ export default factories.createCoreController(
             where: { users_permissions_user: userSession.id },
           }));
 
+        if (!userAddress) {
+          return ctx.badRequest(
+            "Configura una dirección de envío en tu perfil antes de pagar.",
+          );
+        }
+
+        const { cost: costOfShipping, label: shippingLabel } =
+          calculateShippingServerSide((userAddress as any).postalCode);
+
+        if (costOfShipping === -1) {
+          return ctx.badRequest(
+            "No hacemos envíos a tu domicilio por el momento.",
+          );
+        }
+
+        console.log(`🚚 Envío: ${shippingLabel} ($${costOfShipping})`);
+
         const fullName =
           `${userProfile?.firstName || userSession.username || "Cliente"} ${userProfile?.lastName || ""}`.trim();
 
@@ -230,12 +301,20 @@ export default factories.createCoreController(
 
             if (!item) throw new Error(`Producto con ID ${p.id} no encontrado`);
 
+            const quantity = Number(p.quantity) || 1;
+            const availableStock = Number(item.stock) || 0;
+            if (quantity > availableStock) {
+              throw new Error(
+                `No hay suficiente existencia de "${item.productName}" (disponible: ${availableStock}, solicitado: ${quantity}).`,
+              );
+            }
+
             const priceToCharge =
               isB2B && (item as any).wholesalePrice
                 ? (item as any).wholesalePrice
                 : (item as any).price;
 
-            totalAmount += Number(priceToCharge) * (Number(p.quantity) || 1);
+            totalAmount += Number(priceToCharge) * quantity;
 
             return {
               id: item.id,
@@ -244,21 +323,13 @@ export default factories.createCoreController(
               code: item.code,
               image: Array.isArray(item.images) ? item.images[0] : null,
               price: priceToCharge,
-              quantity: Number(p.quantity) || 1,
+              quantity,
             };
           }),
         );
 
-        const getAuthHeader = () => {
-          const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
-          if (!privateKey) {
-            throw new Error("OPENPAY_PRIVATE_KEY no configurada");
-          }
-          return Buffer.from(`${privateKey}:`).toString("base64");
-        };
-
-        const merchantId = (process.env.OPENPAY_MERCHANT_ID || "").trim();
-        const authHeader = getAuthHeader();
+        const merchantId = getOpenpayMerchantId();
+        const authHeader = getOpenpayAuthHeader();
         const uniqueOrderId = `ORD${Date.now()}`;
         const finalTotalWithShipping = totalAmount + costOfShipping;
         const finalAmountStr = finalTotalWithShipping.toFixed(2);
@@ -316,8 +387,7 @@ export default factories.createCoreController(
             total: parseFloat(finalAmountStr),
             subtotal: parseFloat(subtotal.toFixed(2)),
             shippingPrice: costOfShipping,
-            shippingLabel:
-              ctx.request.body?.data?.shippingLabel || "Envío Estándar",
+            shippingLabel,
             iva: parseFloat(iva.toFixed(2)),
             orderStatus: "pending",
             user: userSession.id,
@@ -339,7 +409,7 @@ export default factories.createCoreController(
 
     async webhook(ctx) {
       try {
-        const { type, transaction, verification_code } = ctx.request.body;
+        const { type, transaction } = ctx.request.body;
 
         console.log(
           "📦 CUERPO DEL WEBHOOK:",
@@ -358,9 +428,10 @@ export default factories.createCoreController(
 
         if (successEvents.includes(type)) {
           const openpayOrderId = transaction?.order_id;
+          const chargeId = transaction?.id;
 
-          if (!openpayOrderId) {
-            console.log("❌ Webhook sin order_id");
+          if (!openpayOrderId || !chargeId) {
+            console.log("❌ Webhook sin order_id o transaction id");
             return ctx.send({ received: true });
           }
 
@@ -378,7 +449,40 @@ export default factories.createCoreController(
           }
 
           if (order.orderStatus !== "paid") {
-            const paymentInfo = extractPaymentInfo(transaction);
+            // El cuerpo del webhook no es confiable (endpoint publico, sin
+            // firma). Se confirma la transaccion directamente con Openpay
+            // antes de marcar la orden como pagada.
+            const verifiedCharge = await verifyOpenpayCharge(chargeId);
+
+            if (!verifiedCharge) {
+              console.log(
+                `❌ No se pudo verificar la transaccion ${chargeId} con Openpay`,
+              );
+              return ctx.send({ received: true });
+            }
+
+            if (verifiedCharge.status !== "completed") {
+              console.log(
+                `❌ Transaccion ${chargeId} no esta "completed" segun Openpay (status: ${verifiedCharge.status})`,
+              );
+              return ctx.send({ received: true });
+            }
+
+            if (verifiedCharge.order_id !== openpayOrderId) {
+              console.log(
+                `❌ order_id de la transaccion verificada (${verifiedCharge.order_id}) no coincide con el del webhook (${openpayOrderId})`,
+              );
+              return ctx.send({ received: true });
+            }
+
+            if (Number(verifiedCharge.amount) !== Number(order.total)) {
+              console.log(
+                `❌ Monto verificado (${verifiedCharge.amount}) no coincide con el total de la orden (${order.total})`,
+              );
+              return ctx.send({ received: true });
+            }
+
+            const paymentInfo = extractPaymentInfo(verifiedCharge);
             const updatedOrder = await strapi
               .documents("api::order.order")
               .update({
