@@ -1,3 +1,29 @@
+## 🧪 Entorno de pruebas local
+
+Este proyecto se conecta a Postgres en producción (Railway), pero para
+desarrollar/probar localmente usa SQLite — ya configurado en `.env`
+(`DATABASE_CLIENT=sqlite`, `.tmp/local-dev.db`). No toca producción: `.env`
+está en `.gitignore` y Railway usa sus propias variables de entorno.
+
+```bash
+npm run develop      # levanta el backend en http://localhost:1337
+npm run seed:local    # crea/repara el usuario admin y 5 productos de prueba
+```
+
+Credenciales del admin de prueba (para el login del frontend en `/login`):
+
+- Email: `tienda_admin@test.local`
+- Password: `AdminPrueba123!`
+
+`npm run seed:local` es idempotente — córrelo cuando quieras (por ejemplo
+si borras `.tmp/local-dev.db` para empezar de cero) y deja todo en el mismo
+estado sin duplicar productos ni usuarios.
+
+El frontend (`ixoye-frontend`) ya apunta a este backend por defecto vía su
+`.env.local` (`NEXT_PUBLIC_API_URL=http://localhost:1337`).
+
+---
+
 # 🚀 Getting started with Strapi
 
 Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.

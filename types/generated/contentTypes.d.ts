@@ -638,6 +638,9 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    cardBrand: Schema.Attribute.String;
+    cardLast4: Schema.Attribute.String;
+    cardType: Schema.Attribute.Enumeration<['debito', 'credito']>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -651,6 +654,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
       ['pending', 'paid', 'shipped', 'delivered', 'cancelled']
     > &
       Schema.Attribute.DefaultTo<'pending'>;
+    paymentMethod: Schema.Attribute.String;
     phone: Schema.Attribute.String;
     products: Schema.Attribute.JSON;
     publishedAt: Schema.Attribute.DateTime;
