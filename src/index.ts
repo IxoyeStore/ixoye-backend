@@ -14,6 +14,9 @@ const PUBLIC_ROLE_FORBIDDEN_ACTIONS = [
 // produccion para hacerlo a mano.
 const AUTHENTICATED_ROLE_REQUIRED_ACTIONS = [
   "api::order.order.status",
+  "api::order.order.find",
+  "api::order.order.findOne",
+  "api::order.order.create",
   "api::address.address.find",
   "api::address.address.findOne",
   "api::address.address.create",

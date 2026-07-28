@@ -237,9 +237,105 @@ function extractPaymentInfo(transaction: any): {
   };
 }
 
+async function isAdminUser(strapi: any, userId?: number): Promise<boolean> {
+  if (!userId) return false;
+  const user = await strapi
+    .query("plugin::users-permissions.user")
+    .findOne({ where: { id: userId }, populate: ["role"] });
+  return user?.role?.name === "Admin";
+}
+
+function orderOwnerId(order: any): number | undefined {
+  const rel = order?.user;
+  return typeof rel === "object" ? rel?.id : rel;
+}
+
 export default factories.createCoreController(
   "api::order.order",
   ({ strapi }) => ({
+    // Un pedido tiene nombre, correo, telefono, contenido y metodo de
+    // pago del cliente - por defecto Strapi no restringe find/findOne
+    // por dueno, asi que cualquier cliente autenticado con el permiso
+    // podia leer el pedido de CUALQUIER otro cliente. Se fuerza
+    // ownership aqui; Admin conserva acceso completo para /admin/orders.
+    async find(ctx) {
+      const userId = ctx.state.user?.id;
+      if (!userId) return ctx.unauthorized();
+
+      if (await isAdminUser(strapi, userId)) {
+        return super.find(ctx);
+      }
+
+      // No usar el filtro publico por relacion (Strapi lo rechaza para
+      // roles no-admin); se consulta directo con el servicio interno.
+      const page = Number((ctx.query as any).pagination?.page) || 1;
+      const pageSize = Math.min(
+        Number((ctx.query as any).pagination?.pageSize) || 25,
+        100,
+      );
+
+      const [results, total] = await Promise.all([
+        strapi.documents("api::order.order").findMany({
+          filters: { user: userId } as any,
+          sort: { createdAt: "desc" } as any,
+          limit: pageSize,
+          start: (page - 1) * pageSize,
+        }),
+        strapi.documents("api::order.order").count({
+          filters: { user: userId } as any,
+        }),
+      ]);
+
+      return {
+        data: results,
+        meta: {
+          pagination: {
+            page,
+            pageSize,
+            pageCount: Math.max(1, Math.ceil(total / pageSize)),
+            total,
+          },
+        },
+      };
+    },
+
+    async findOne(ctx) {
+      const userId = ctx.state.user?.id;
+      if (!userId) return ctx.unauthorized();
+
+      const admin = await isAdminUser(strapi, userId);
+      const { id: documentId } = ctx.params;
+
+      const order = await strapi.documents("api::order.order").findOne({
+        documentId,
+        populate: ["user"],
+      });
+
+      if (!order) return ctx.notFound();
+      if (!admin && orderOwnerId(order) !== userId) return ctx.notFound();
+
+      const { user, ...safe } = order as any;
+      return { data: safe };
+    },
+
+    async update(ctx) {
+      const userId = ctx.state.user?.id;
+      if (!userId) return ctx.unauthorized();
+      if (!(await isAdminUser(strapi, userId))) {
+        return ctx.forbidden("Solo el administrador puede modificar un pedido.");
+      }
+      return super.update(ctx);
+    },
+
+    async delete(ctx) {
+      const userId = ctx.state.user?.id;
+      if (!userId) return ctx.unauthorized();
+      if (!(await isAdminUser(strapi, userId))) {
+        return ctx.forbidden("Solo el administrador puede eliminar un pedido.");
+      }
+      return super.delete(ctx);
+    },
+
     async create(ctx) {
       try {
         const userSession = ctx.state.user;
