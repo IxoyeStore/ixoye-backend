@@ -360,7 +360,7 @@ export default factories.createCoreController(
             shipping: costOfShipping.toFixed(2),
             shipping_label: shippingLabel || "Envío Estándar",
           },
-          redirect_url: `${baseUrl}/success`,
+          redirect_url: `${baseUrl}/success?order=${uniqueOrderId}`,
         };
 
         const response = await axios({
@@ -541,6 +541,34 @@ export default factories.createCoreController(
         console.error("❌ Error crítico:", error);
         return ctx.badRequest("Webhook Error");
       }
+    },
+
+    // Usado por la pagina de "gracias por tu compra" para confirmar el
+    // estado real del pago antes de mostrar el mensaje de exito. Nunca
+    // hay que asumir que el pago se completo solo porque Openpay
+    // redirigio de vuelta al sitio.
+    async status(ctx) {
+      const userSession = ctx.state.user;
+      if (!userSession) return ctx.unauthorized("Sesión inválida.");
+
+      const { stripeId } = ctx.params;
+      if (!stripeId) return ctx.badRequest("Falta el identificador de la orden.");
+
+      const order = await strapi.documents("api::order.order").findFirst({
+        filters: { stripeId },
+        populate: ["user"],
+      });
+
+      if (!order || (order.user as any)?.id !== userSession.id) {
+        return ctx.notFound("Orden no encontrada.");
+      }
+
+      return {
+        data: {
+          orderStatus: order.orderStatus,
+          total: order.total,
+        },
+      };
     },
   }),
 );

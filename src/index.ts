@@ -7,6 +7,15 @@ const PUBLIC_ROLE_FORBIDDEN_ACTIONS = [
   "api::profile.profile.findOne",
 ];
 
+// Acciones personalizadas (no son find/create/update estandar) que un
+// cliente autenticado si debe poder ejecutar. Strapi no las habilita solo
+// por tener una ruta definida, hay que otorgar el permiso explicitamente.
+// Se asegura en cada arranque porque no hay acceso al panel de Strapi en
+// produccion para hacerlo a mano.
+const AUTHENTICATED_ROLE_REQUIRED_ACTIONS = [
+  "api::order.order.status",
+];
+
 async function revokeForbiddenPublicPermissions({ strapi }: { strapi: any }) {
   try {
     const publicRole = await strapi
@@ -40,9 +49,42 @@ async function revokeForbiddenPublicPermissions({ strapi }: { strapi: any }) {
   }
 }
 
+async function ensureAuthenticatedPermissions({ strapi }: { strapi: any }) {
+  try {
+    const authRole = await strapi
+      .query("plugin::users-permissions.role")
+      .findOne({ where: { type: "authenticated" } });
+
+    if (!authRole) return;
+
+    const existing = await strapi
+      .query("plugin::users-permissions.permission")
+      .findMany({
+        where: { action: { $in: AUTHENTICATED_ROLE_REQUIRED_ACTIONS }, role: authRole.id },
+      });
+    const existingActions = new Set(existing.map((p: any) => p.action));
+    const missing = AUTHENTICATED_ROLE_REQUIRED_ACTIONS.filter((a) => !existingActions.has(a));
+
+    if (missing.length === 0) return;
+
+    for (const action of missing) {
+      await strapi.query("plugin::users-permissions.permission").create({
+        data: { action, role: authRole.id },
+      });
+    }
+
+    strapi.log.info(
+      `🔓 Se otorgaron ${missing.length} permiso(s) al rol Authenticated: ${missing.join(", ")}`,
+    );
+  } catch (err) {
+    strapi.log.error("Error al otorgar permisos requeridos a Authenticated:", err);
+  }
+}
+
 export default {
   register() {},
   async bootstrap({ strapi }: { strapi: any }) {
     await revokeForbiddenPublicPermissions({ strapi });
+    await ensureAuthenticatedPermissions({ strapi });
   },
 };

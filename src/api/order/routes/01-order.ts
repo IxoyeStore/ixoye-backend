@@ -10,5 +10,14 @@ export default {
         middlewares: [],
       },
     },
+    {
+      method: "GET",
+      path: "/orders/status/:stripeId",
+      handler: "order.status",
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
   ],
 };
