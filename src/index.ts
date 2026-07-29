@@ -13,6 +13,9 @@ const PUBLIC_ROLE_FORBIDDEN_ACTIONS = [
 // Se asegura en cada arranque porque no hay acceso al panel de Strapi en
 // produccion para hacerlo a mano.
 const AUTHENTICATED_ROLE_REQUIRED_ACTIONS = [
+  "api::profile.profile.find",
+  "api::profile.profile.create",
+  "api::profile.profile.update",
   "api::order.order.status",
   "api::order.order.find",
   "api::order.order.findOne",

@@ -315,6 +315,20 @@ export default factories.createCoreController(
       if (!admin && orderOwnerId(order) !== userId) return ctx.notFound();
 
       const { user, ...safe } = order as any;
+
+      // El admin necesita saber a que cuenta pertenece el pedido (el panel
+      // /admin/orders lo usa como respaldo cuando el pedido es muy viejo y
+      // no tiene customerName/email guardados); nunca se exponen los demas
+      // campos del usuario (hash de password, tokens, etc.).
+      if (admin && user) {
+        return {
+          data: {
+            ...safe,
+            user: { id: user.id, username: user.username, email: user.email },
+          },
+        };
+      }
+
       return { data: safe };
     },
 
@@ -356,6 +370,16 @@ export default factories.createCoreController(
           .findOne({
             where: { users_permissions_user: userSession.id },
           });
+
+        if (
+          !userProfile?.firstName?.trim() ||
+          !userProfile?.lastName?.trim() ||
+          !userProfile?.phone?.trim()
+        ) {
+          return ctx.badRequest(
+            "Completa tu nombre, apellido y teléfono en tu perfil antes de pagar.",
+          );
+        }
 
         const userAddress =
           (await strapi.db.query("api::address.address").findOne({
