@@ -38,7 +38,10 @@ async function sendToTokens(
   notification: { title: string; body: string },
   data: Record<string, string> = {},
 ) {
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    strapi.log.info('[push-debug] sendToTokens: 0 tokens, se omite el envio.');
+    return;
+  }
 
   const app = getFirebaseApp(strapi);
   if (!app) return;
@@ -49,6 +52,13 @@ async function sendToTokens(
       notification,
       data,
     });
+
+    strapi.log.info(
+      `[push-debug] sendToTokens: ${tokens.length} token(s), ${response.successCount} exitosos, ${response.failureCount} fallidos. ${response.responses
+        .filter((r) => !r.success)
+        .map((r) => r.error?.code)
+        .join(', ')}`,
+    );
 
     // Un token deja de ser valido cuando el usuario desinstala la app o el
     // sistema lo rota; hay que limpiarlo o Firebase lo seguira rechazando
@@ -84,6 +94,10 @@ export async function sendPushToUser(
   const rows = await strapi.db
     .query('api::device-token.device-token')
     .findMany({ where: { users_permissions_user: userId } });
+
+  strapi.log.info(
+    `[push-debug] sendPushToUser: userId=${userId} tokens encontrados=${rows.length}`,
+  );
 
   await sendToTokens(
     strapi,

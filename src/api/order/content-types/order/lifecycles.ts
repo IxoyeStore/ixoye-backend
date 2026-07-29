@@ -24,23 +24,38 @@ export default {
   // Se guarda el estado ANTERIOR antes de que se aplique el cambio, para
   // poder comparar en afterUpdate (Strapi no da el valor previo directo).
   async beforeUpdate(event: any) {
-    if (!event.params?.data || !('orderStatus' in event.params.data)) return;
+    if (!event.params?.data || !('orderStatus' in event.params.data)) {
+      strapi.log.info(
+        `[push-debug] beforeUpdate: sin orderStatus en params.data (${JSON.stringify(event.params?.data)})`,
+      );
+      return;
+    }
 
+    // La relacion "user" no es una columna plana en la tabla orders (Strapi
+    // v5 guarda TODAS las relaciones en tablas de enlace), asi que sin
+    // populate explicito jamas se resuelve y userId sale undefined.
     const existing = await strapi.db
       .query('api::order.order')
-      .findOne({ where: event.params.where });
+      .findOne({ where: event.params.where, populate: ['user'] });
+
+    strapi.log.info(
+      `[push-debug] beforeUpdate: where=${JSON.stringify(event.params.where)} existing=${existing ? `id=${existing.id} status=${existing.orderStatus} user=${existing.user}` : 'NULL'}`,
+    );
 
     event.state = {
       previousStatus: existing?.orderStatus,
-      userId: existing?.user,
+      userId: resolveUserId(existing?.user),
     };
   },
 
   async afterUpdate(event: any) {
     const { result, state } = event;
+    strapi.log.info(
+      `[push-debug] afterUpdate: previousStatus=${state?.previousStatus} newStatus=${result.orderStatus} user=${JSON.stringify(result.user)} stateUserId=${state?.userId}`,
+    );
     if (!state?.previousStatus || state.previousStatus === result.orderStatus) return;
 
-    const userId = resolveUserId(result.user) || state.userId;
+    const userId = resolveUserId(result.user) ?? state.userId;
     const statusLabel = STATUS_LABELS[result.orderStatus] || result.orderStatus;
 
     if (userId) {
