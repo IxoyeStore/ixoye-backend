@@ -83,6 +83,12 @@
       "relation": "oneToMany",
       "target": "api::question.question",
       "mappedBy": "user"
+    },
+    "deviceTokens": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::device-token.device-token",
+      "mappedBy": "users_permissions_user"
     }
   }
 }

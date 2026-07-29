@@ -26,6 +26,7 @@
     "better-sqlite3": "12.4.1",
     "cloudinary": "^2.9.0",
     "co-body": "^6.2.0",
+    "firebase-admin": "^14.2.0",
     "fs-extra": "^10.0.0",
     "mime-types": "^2.1.27",
     "openpay": "^1.0.5",

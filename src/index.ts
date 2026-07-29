@@ -16,6 +16,7 @@ const AUTHENTICATED_ROLE_REQUIRED_ACTIONS = [
   "api::profile.profile.find",
   "api::profile.profile.create",
   "api::profile.profile.update",
+  "api::device-token.device-token.register",
   "api::order.order.status",
   "api::order.order.find",
   "api::order.order.findOne",

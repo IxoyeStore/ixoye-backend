@@ -531,6 +531,42 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiDeviceTokenDeviceToken extends Struct.CollectionTypeSchema {
+  collectionName: 'device_tokens';
+  info: {
+    displayName: 'Device Token';
+    pluralName: 'device-tokens';
+    singularName: 'device-token';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::device-token.device-token'
+    > &
+      Schema.Attribute.Private;
+    platform: Schema.Attribute.Enumeration<['android']> &
+      Schema.Attribute.DefaultTo<'android'>;
+    publishedAt: Schema.Attribute.DateTime;
+    token: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    users_permissions_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
 export interface ApiFilterFilter extends Struct.CollectionTypeSchema {
   collectionName: 'filters';
   info: {
@@ -1404,6 +1440,10 @@ export interface PluginUsersPermissionsUser
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    deviceTokens: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::device-token.device-token'
+    >;
     email: Schema.Attribute.Email &
       Schema.Attribute.Required &
       Schema.Attribute.Unique &
@@ -1456,6 +1496,7 @@ declare module '@strapi/strapi' {
       'api::about.about': ApiAboutAbout;
       'api::address.address': ApiAddressAddress;
       'api::category.category': ApiCategoryCategory;
+      'api::device-token.device-token': ApiDeviceTokenDeviceToken;
       'api::filter.filter': ApiFilterFilter;
       'api::global.global': ApiGlobalGlobal;
       'api::importer.importer': ApiImporterImporter;
