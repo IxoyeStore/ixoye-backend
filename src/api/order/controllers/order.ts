@@ -12,23 +12,36 @@ const cpMexico: Record<string, { e: string; m: string; c?: string[] }> =
     fs.readFileSync(path.join(process.cwd(), "data", "cp-mexico.json"), "utf-8"),
   );
 
+// Envio gratis solo a partir de este monto; por debajo siempre se cobra
+// la tarifa fija. Debe coincidir siempre con FREE_SHIPPING_MIN_TOTAL /
+// SHIPPING_FLAT_COST en app/(routes)/cart/page.tsx del frontend, que es
+// solo para mostrarle el costo al cliente antes de pagar - el cobro real
+// siempre se decide aqui.
+const FREE_SHIPPING_MIN_TOTAL = 499;
+const SHIPPING_FLAT_COST = 150;
+
 // Replica la logica de app/(routes)/cart/page.tsx del lado del servidor.
 // Nunca hay que confiar en el shippingPrice que manda el cliente: se
-// recalcula aqui a partir del CP guardado en la direccion del usuario.
+// recalcula aqui a partir del CP guardado en la direccion del usuario y
+// el total real de los productos en la orden.
 function calculateShippingServerSide(
   postalCode: string | null | undefined,
+  productsTotal: number,
 ): { cost: number; label: string } {
   if (!postalCode || postalCode.length !== 5) {
     return { cost: -1, label: "No disponible" };
   }
   const entry = cpMexico[postalCode];
-  if (!entry) {
-    return { cost: 250, label: "Envío Nacional" };
-  }
-  if (entry.e !== "Nayarit") {
+  // Solo hacemos envios dentro de Nayarit; fuera de esa zona (o un CP que
+  // ni siquiera existe en el catalogo) el cliente debe comunicarse con
+  // nosotros - no existe una tarifa nacional generica.
+  if (!entry || entry.e !== "Nayarit") {
     return { cost: -1, label: "No disponible" };
   }
-  return { cost: 0, label: "Entrega Local" };
+  if (productsTotal >= FREE_SHIPPING_MIN_TOTAL) {
+    return { cost: 0, label: "Entrega Local" };
+  }
+  return { cost: SHIPPING_FLAT_COST, label: "Entrega Local" };
 }
 
 const openpay = new Openpay(
@@ -395,17 +408,6 @@ export default factories.createCoreController(
           );
         }
 
-        const { cost: costOfShipping, label: shippingLabel } =
-          calculateShippingServerSide((userAddress as any).postalCode);
-
-        if (costOfShipping === -1) {
-          return ctx.badRequest(
-            "No hacemos envíos a tu domicilio por el momento.",
-          );
-        }
-
-        console.log(`🚚 Envío: ${shippingLabel} ($${costOfShipping})`);
-
         const fullName =
           `${userProfile?.firstName || userSession.username || "Cliente"} ${userProfile?.lastName || ""}`.trim();
 
@@ -447,6 +449,23 @@ export default factories.createCoreController(
             };
           }),
         );
+
+        // El envio gratis depende del total de la orden, asi que se
+        // calcula hasta aqui, ya con totalAmount calculado a partir de los
+        // productos reales (nunca del total que mande el cliente).
+        const { cost: costOfShipping, label: shippingLabel } =
+          calculateShippingServerSide(
+            (userAddress as any).postalCode,
+            totalAmount,
+          );
+
+        if (costOfShipping === -1) {
+          return ctx.badRequest(
+            "No hacemos envíos a tu domicilio por el momento.",
+          );
+        }
+
+        console.log(`🚚 Envío: ${shippingLabel} ($${costOfShipping})`);
 
         const merchantId = getOpenpayMerchantId();
         const authHeader = getOpenpayAuthHeader();
