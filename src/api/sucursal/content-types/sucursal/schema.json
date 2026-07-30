@@ -1,0 +1,27 @@
+{
+  "kind": "collectionType",
+  "collectionName": "sucursales",
+  "info": {
+    "singularName": "sucursal",
+    "pluralName": "sucursales",
+    "displayName": "Sucursal"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "address": {
+      "type": "string",
+      "required": true
+    },
+    "mapsUrl": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

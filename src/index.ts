@@ -93,10 +93,71 @@ async function ensureAuthenticatedPermissions({ strapi }: { strapi: any }) {
   }
 }
 
+// Sucursales que ya existian hardcodeadas en el frontend antes de que este
+// content-type existiera. Se siembran una sola vez (si la tabla esta vacia)
+// para que la pagina publica /sucursales no se quede en blanco justo
+// despues de este deploy, mientras alguien las revisa/edita desde el
+// nuevo panel de admin.
+const DEFAULT_SUCURSALES = [
+  {
+    name: "Sucursal Libramiento Matriz",
+    address: "Libramiento 312, Los Sauces (Reserva Territorial), Los Sauces, 63197 Tepic, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/6K8vxpxve8PYhX9a6",
+  },
+  {
+    name: "Sucursal Emmark Libramiento",
+    address: "Vicente Guerrero 298, Plan de Ayala, 63197 Tepic, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/3wMHA5AYVYG4CdjRA",
+  },
+  {
+    name: "Sucursal Mezcales",
+    address: "Av. San Vicente 800, Las Parotas, 63735 Mezcales, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/BJ4EpFc1UgbwXhVS7",
+  },
+  {
+    name: "Sucursal Xalisco",
+    address: "Blvd. Tepic-Xalisco 58, Lomas del Nayar, 63782 Xalisco, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/Pvr9fe6UpE3rYB7v6",
+  },
+  {
+    name: "Sucursal San Cayetano",
+    address: "Insurgentes 3, Vivero, 63511 San Cayetano, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/R6cn28jY9XVFEo5T9",
+  },
+  {
+    name: "Sucursal Bucerías",
+    address: "Av. Héroes de Nacozari, Flamingos, 63732 Flamingos, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/RUo5wi8PFk7XDab79",
+  },
+  {
+    name: "Sucursal La Peñita",
+    address: "México 200, Paraíso Escondido, 63720 Paraíso Escondido, Nay.",
+    mapsUrl: "https://maps.app.goo.gl/9pAtNdJ35nK81cxq7",
+  },
+];
+
+async function seedDefaultSucursales({ strapi }: { strapi: any }) {
+  try {
+    const count = await strapi.documents("api::sucursal.sucursal").count({});
+    if (count > 0) return;
+
+    for (const data of DEFAULT_SUCURSALES) {
+      await strapi.documents("api::sucursal.sucursal").create({ data });
+    }
+
+    strapi.log.info(
+      `🏬 Se sembraron ${DEFAULT_SUCURSALES.length} sucursal(es) por defecto (tabla vacia).`,
+    );
+  } catch (err) {
+    strapi.log.error("Error al sembrar sucursales por defecto:", err);
+  }
+}
+
 export default {
   register() {},
   async bootstrap({ strapi }: { strapi: any }) {
     await revokeForbiddenPublicPermissions({ strapi });
     await ensureAuthenticatedPermissions({ strapi });
+    await seedDefaultSucursales({ strapi });
   },
 };
