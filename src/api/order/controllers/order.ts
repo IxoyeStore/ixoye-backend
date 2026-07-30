@@ -2,7 +2,6 @@
 import fs from "fs";
 import path from "path";
 import axios from "axios";
-import Openpay from "openpay";
 import { factories } from "@strapi/strapi";
 
 // Mismo dataset de CP que usa el frontend para cotizar el envio. Se carga
@@ -43,12 +42,6 @@ function calculateShippingServerSide(
   }
   return { cost: SHIPPING_FLAT_COST, label: "Entrega Local" };
 }
-
-const openpay = new Openpay(
-  process.env.OPENPAY_MERCHANT_ID as string,
-  process.env.OPENPAY_PRIVATE_KEY as string,
-  true, // false para Sandbox, true para Produccion
-);
 
 function getOpenpayAuthHeader(): string {
   const privateKey = (process.env.OPENPAY_PRIVATE_KEY || "").trim();
