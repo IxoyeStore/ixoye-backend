@@ -16,6 +16,36 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
+// Mensaje especifico por estado en vez de un generico "cambio de estado".
+// "cancelled" SI se notifica: hoy toda cancelacion es una decision manual
+// de alguien del negocio (no existe todavia una cancelacion automatica
+// por inactividad), asi que es informacion real y util para el cliente.
+// Si en el futuro se agrega auto-cancelacion por inactividad, ese
+// mecanismo debe evitar pasar por este mismo camino (o marcar el pedido
+// de otra forma) para no generar este aviso.
+const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
+  paid: {
+    title: '¡Compra exitosa!',
+    body: 'Tu compra ha sido realizada correctamente.',
+  },
+  processing: {
+    title: 'Preparando tu pedido',
+    body: 'Tu pedido está siendo preparado.',
+  },
+  shipped: {
+    title: '¡Tu pedido va en camino!',
+    body: 'Tu pedido está en camino.',
+  },
+  delivered: {
+    title: '¡Pedido entregado!',
+    body: 'Recibiste tu producto.',
+  },
+  cancelled: {
+    title: 'Pedido cancelado',
+    body: 'Tu pedido fue cancelado.',
+  },
+};
+
 function resolveUserId(value: any): number | undefined {
   return typeof value === 'object' && value !== null ? value.id : value;
 }
@@ -56,16 +86,22 @@ export default {
     if (!state?.previousStatus || state.previousStatus === result.orderStatus) return;
 
     const userId = resolveUserId(result.user) ?? state.userId;
-    const statusLabel = STATUS_LABELS[result.orderStatus] || result.orderStatus;
+    const message = STATUS_MESSAGES[result.orderStatus];
 
-    if (userId) {
+    if (userId && !message) {
+      strapi.log.info(
+        `[push-debug] afterUpdate: sin mensaje push definido para el estado "${STATUS_LABELS[result.orderStatus] || result.orderStatus}", se omite el envio al cliente.`,
+      );
+    }
+
+    if (userId && message) {
       try {
         await sendPushToUser(
           strapi,
           userId,
           {
-            title: 'Tu pedido cambió de estado',
-            body: `Pedido #${result.id}: ${statusLabel}`,
+            title: message.title,
+            body: `${message.body} Pedido #${result.id}.`,
           },
           {
             type: 'order_status',
