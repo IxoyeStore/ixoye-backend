@@ -86,6 +86,7 @@ async function sendConfirmationEmail(
   addressData: any,
 ) {
   try {
+    const baseUrl = process.env.CLIENT_URL || "https://www.refaccionesixoye.mx";
     const productsList = products
       .map(
         (p: any) =>
@@ -125,8 +126,8 @@ async function sendConfirmationEmail(
         <div style="background-color: #f9f9f9; padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
           <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0e0;">
             
-            <div style="background-color: #0071b1; color: white; padding: 30px; text-align: center;">
-              <h1 style="margin: 0; font-size: 22px;">Refacciones Diésel y Agrícola Ixoye</h1>
+            <div style="background-color: #ffffff; padding: 30px; text-align: center; border-bottom: 1px solid #eee;">
+              <img src="${baseUrl}/logo-ixoye.png" alt="Ixoye" style="height: 56px; width: auto;" />
             </div>
 
             <div style="padding: 40px;">

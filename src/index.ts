@@ -163,11 +163,122 @@ async function seedDefaultSucursales({ strapi }: { strapi: any }) {
   }
 }
 
+// Los correos de "restablecer contraseña" y "confirmar cuenta" ya estaban
+// personalizados a mano desde el panel de Strapi (colores, textos), pero
+// sin logo. No hay acceso al panel de Strapi en produccion para editarlas
+// ahi, asi que se fuerzan por codigo en cada arranque - el HTML de abajo
+// es una copia exacta de lo que ya estaba configurado, solo se le agrego
+// el logo de Ixoye arriba.
+const CLIENT_URL = process.env.CLIENT_URL || "https://www.refaccionesixoye.mx";
+const LOGO_URL = `${CLIENT_URL}/logo-ixoye.png`;
+
+const BRANDED_EMAIL_TEMPLATES = {
+  reset_password: {
+    display: "Email.template.reset_password",
+    icon: "sync",
+    subject: "Restablece tu contraseña en Ixoye",
+    message: `
+<div style="font-family: sans-serif; color: #001e36; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+  <div style="text-align: center; margin-bottom: 20px;">
+    <img src="${LOGO_URL}" alt="Ixoye" style="height: 56px; width: auto;" />
+  </div>
+  <h2 style="color: #0055a4;">Hola,</h2>
+
+  <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>Refacciones Diésel y Agrícola Ixoye</strong>.</p>
+
+  <p>Para crear una nueva contraseña, haz clic en el siguiente enlace:</p>
+
+  <div style="margin: 30px 0;">
+    <a href="<%= URL %>?code=<%= TOKEN %>"
+       style="background-color: #0055a4; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+      Restablecer mi contraseña
+    </a>
+  </div>
+
+  <p style="font-size: 0.9em; color: #64748b;">
+    Si el enlace no funciona, copia y pega el siguiente enlace en tu navegador:<br>
+    <span style="color: #0055a4;"><%= URL %>?code=<%= TOKEN %></span>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+
+  <p>Si tú no realizaste esta solicitud, puedes ignorar este correo; tu contraseña seguirá siendo la misma.</p>
+
+  <p>Atentamente,<br>
+  <strong>Equipo de Refacciones Diésel y Agrícola Ixoye</strong></p>
+</div>
+    `,
+  },
+  email_confirmation: {
+    display: "Email.template.email_confirmation",
+    icon: "check-square",
+    subject: "Confirma tu cuenta en Ixoye",
+    message: `
+<div style="font-family: sans-serif; color: #001e36; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 20px; border-radius: 10px;">
+  <div style="text-align: center; margin-bottom: 20px;">
+    <img src="${LOGO_URL}" alt="Ixoye" style="height: 56px; width: auto;" />
+  </div>
+  <h2 style="color: #0055a4; text-align: center;">¡Gracias por registrarte!</h2>
+
+  <p>Estamos muy contentos de tenerte en <strong>Refacciones Diésel y Agrícola Ixoye</strong>. Para poder acceder a todos nuestros beneficios y realizar pedidos, solo necesitamos confirmar que esta dirección de correo te pertenece.</p>
+
+  <p style="text-align: center; margin: 30px 0;">
+    <a href="https://refaccionesixoye.mx/confirm-email?code=<%= CODE %>"
+       style="background-color: #0055a4; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      Confirmar mi cuenta
+    </a>
+  </p>
+
+  <p style="font-size: 0.9em; color: #64748b;">
+    Si el enlace no funciona, puedes copiar y pegar este enlace en tu navegador:<br>
+    <span style="color: #0055a4; word-break: break-all;">https://refaccionesixoye.mx/confirm-email?code=<%= CODE %></span>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+
+  <p style="font-size: 0.85em; color: #94a3b8; text-align: center;">
+    Si no te registraste en nuestro sitio, puedes ignorar este mensaje.<br>
+    © ${new Date().getFullYear()} Refacciones Diésel y Agrícola Ixoye. Tepic, Nayarit.
+  </p>
+</div>
+    `,
+  },
+};
+
+async function ensureBrandedEmailTemplates({ strapi }: { strapi: any }) {
+  try {
+    const emailStore = strapi.store({
+      type: "plugin",
+      name: "users-permissions",
+      key: "email",
+    });
+    const current = (await emailStore.get()) || {};
+
+    await emailStore.set({
+      value: {
+        ...current,
+        reset_password: { ...current.reset_password, ...BRANDED_EMAIL_TEMPLATES.reset_password },
+        email_confirmation: {
+          ...current.email_confirmation,
+          ...BRANDED_EMAIL_TEMPLATES.email_confirmation,
+        },
+      },
+    });
+
+    strapi.log.info(
+      "📧 Plantillas de correo de cuenta (reset/confirmación) actualizadas con el logo de Ixoye.",
+    );
+  } catch (err) {
+    strapi.log.error("Error al actualizar las plantillas de correo de cuenta:", err);
+  }
+}
+
 export default {
   register() {},
   async bootstrap({ strapi }: { strapi: any }) {
     await revokeForbiddenPublicPermissions({ strapi });
     await ensureAuthenticatedPermissions({ strapi });
     await seedDefaultSucursales({ strapi });
+    await ensureBrandedEmailTemplates({ strapi });
   },
 };
