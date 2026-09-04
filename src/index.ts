@@ -134,6 +134,16 @@ const DEFAULT_SUCURSALES = [
     address: "México 200, Paraíso Escondido, 63720 Paraíso Escondido, Nay.",
     mapsUrl: "https://maps.app.goo.gl/9pAtNdJ35nK81cxq7",
   },
+  {
+    name: "Sucursal Las Juntas, Jalisco",
+    address:
+      "Carretera a Ixtapa #215 Interior C, Las Juntas, entre Revolución y Manuel M. Diéguez, 48291 Puerto Vallarta, Jal.",
+    mapsUrl:
+      "https://www.google.com/maps/search/?api=1&query=" +
+      encodeURIComponent(
+        "Carretera a Ixtapa #215 Interior C, Las Juntas, 48291 Puerto Vallarta, Jal.",
+      ),
+  },
 ];
 
 async function seedDefaultSucursales({ strapi }: { strapi: any }) {
