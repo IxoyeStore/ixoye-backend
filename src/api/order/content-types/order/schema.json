@@ -76,6 +76,9 @@
     },
     "cardLast4": {
       "type": "string"
+    },
+    "openpayChargeId": {
+      "type": "string"
     }
   }
 }

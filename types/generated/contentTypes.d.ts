@@ -686,6 +686,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::order.order'> &
       Schema.Attribute.Private;
+    openpayChargeId: Schema.Attribute.String;
     orderStatus: Schema.Attribute.Enumeration<
       ['pending', 'paid', 'shipped', 'delivered', 'cancelled']
     > &
@@ -962,6 +963,12 @@ export interface ApiSucursalSucursal extends Struct.CollectionTypeSchema {
     address: Schema.Attribute.String & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::sucursal.sucursal'
+    > &
       Schema.Attribute.Private;
     mapsUrl: Schema.Attribute.String & Schema.Attribute.Required;
     name: Schema.Attribute.String & Schema.Attribute.Required;

@@ -243,6 +243,101 @@ function extractPaymentInfo(transaction: any): {
   };
 }
 
+// Marca una orden como pagada, descuenta el stock vendido y manda el
+// correo de confirmacion. Usado tanto por el webhook de Openpay como por
+// la verificacion manual del admin, para que ambos caminos dejen la
+// orden en el mismo estado completo (nunca solo el campo orderStatus).
+async function reconcilePaidOrder(
+  strapi: any,
+  order: any,
+  charge: any,
+): Promise<{ updatedOrder: any; paymentInfo: ReturnType<typeof extractPaymentInfo> }> {
+  const paymentInfo = extractPaymentInfo(charge);
+  const updatedOrder = await strapi.documents("api::order.order").update({
+    documentId: order.documentId,
+    data: {
+      orderStatus: "paid",
+      openpayChargeId: charge.id,
+      ...paymentInfo,
+    } as any,
+  });
+
+  const productsList = order.products as any;
+  if (Array.isArray(productsList)) {
+    for (const item of productsList) {
+      const pId = item.documentId || item.id;
+      const qtySold = Number(item.quantity || 0);
+
+      if (pId) {
+        const product = await strapi.documents("api::product.product").findOne({
+          documentId: pId,
+        });
+
+        if (product) {
+          const currentStock = Number(product.stock || 0);
+          const newStock = Math.max(0, currentStock - qtySold);
+
+          await strapi.documents("api::product.product").update({
+            documentId: product.documentId,
+            data: { stock: newStock },
+          });
+          console.log(`🔹 Stock actualizado: ${product.productName} -> ${newStock}`);
+        }
+      }
+    }
+  }
+
+  try {
+    await sendConfirmationEmail(
+      strapi,
+      updatedOrder,
+      order.products,
+      order.customerName,
+      order.shippingAddress,
+    );
+  } catch (e) {
+    console.error("⚠️ Error email:", e);
+  }
+
+  return { updatedOrder, paymentInfo };
+}
+
+// Busca en Openpay el cargo asociado a nuestro order_id. Se usa cuando
+// el webhook nunca llegó (el admin lo detecta porque el pedido se queda
+// en "pending"): a diferencia del webhook, aquí no partimos de un
+// chargeId conocido, así que se listan los cargos creados desde el
+// momento en que se generó el pedido y se busca el que tenga ese
+// order_id. Nunca falla "cerrado en falso": si no encuentra nada, se
+// reporta como no encontrado en vez de arriesgar una conciliación
+// incorrecta.
+async function findOpenpayChargeByOrderId(
+  openpayOrderId: string,
+  since: Date,
+): Promise<any | null> {
+  try {
+    const merchantId = getOpenpayMerchantId();
+    const authHeader = getOpenpayAuthHeader();
+    const sinceUnix = Math.floor(since.getTime() / 1000) - 300; // 5 min de margen
+
+    const res = await axios.get(`https://api.openpay.mx/v1/${merchantId}/charges`, {
+      headers: { Authorization: `Basic ${authHeader}` },
+      params: {
+        "creation[gte]": sinceUnix,
+        limit: 100,
+      },
+    });
+
+    const charges: any[] = Array.isArray(res.data) ? res.data : [];
+    return charges.find((c) => c.order_id === openpayOrderId) || null;
+  } catch (err: any) {
+    console.error(
+      "❌ No se pudo buscar el cargo en Openpay:",
+      err.response?.data || err.message,
+    );
+    return null;
+  }
+}
+
 async function isAdminUser(strapi: any, userId?: number): Promise<boolean> {
   if (!userId) return false;
   const user = await strapi
@@ -614,57 +709,8 @@ export default factories.createCoreController(
               return ctx.send({ received: true });
             }
 
-            const paymentInfo = extractPaymentInfo(verifiedCharge);
-            const updatedOrder = await strapi
-              .documents("api::order.order")
-              .update({
-                documentId: order.documentId,
-                data: { orderStatus: "paid", ...paymentInfo },
-              });
-
+            await reconcilePaidOrder(strapi, order, verifiedCharge);
             console.log(`✅ Orden ${order.documentId} marcada como PAGADA`);
-
-            const productsList = order.products as any;
-
-            if (Array.isArray(productsList)) {
-              for (const item of productsList) {
-                const pId = item.documentId || item.id;
-                const qtySold = Number(item.quantity || 0);
-
-                if (pId) {
-                  const product = await strapi
-                    .documents("api::product.product")
-                    .findOne({
-                      documentId: pId,
-                    });
-
-                  if (product) {
-                    const currentStock = Number(product.stock || 0);
-                    const newStock = Math.max(0, currentStock - qtySold);
-
-                    await strapi.documents("api::product.product").update({
-                      documentId: product.documentId,
-                      data: { stock: newStock },
-                    });
-                    console.log(
-                      `🔹 Stock actualizado: ${product.productName} -> ${newStock}`,
-                    );
-                  }
-                }
-              }
-            }
-
-            try {
-              await sendConfirmationEmail(
-                strapi,
-                updatedOrder,
-                order.products,
-                order.customerName,
-                order.shippingAddress,
-              );
-            } catch (e) {
-              console.error("⚠️ Error email:", e);
-            }
           }
         }
 
@@ -699,6 +745,90 @@ export default factories.createCoreController(
         data: {
           orderStatus: order.orderStatus,
           total: order.total,
+        },
+      };
+    },
+
+    // Usado por el panel admin cuando un pedido se queda en "pending"
+    // porque el webhook de Openpay nunca llegó. Busca el cargo
+    // directamente con Openpay por order_id y, si ya está completado,
+    // reconcilia la orden igual que el webhook (marca pagado, descuenta
+    // stock y manda el correo) en vez de solo mostrar el dato.
+    async verifyPayment(ctx) {
+      const userId = ctx.state.user?.id;
+      if (!userId) return ctx.unauthorized();
+      if (!(await isAdminUser(strapi, userId))) {
+        return ctx.forbidden("Solo el administrador puede verificar un pago.");
+      }
+
+      const { id: documentId } = ctx.params;
+      const order = await strapi.documents("api::order.order").findOne({ documentId });
+      if (!order) return ctx.notFound("Pedido no encontrado.");
+
+      if (order.orderStatus === "paid") {
+        return {
+          data: {
+            reconciled: false,
+            alreadyPaid: true,
+            paymentMethod: order.paymentMethod,
+            cardBrand: order.cardBrand,
+            cardType: order.cardType,
+            cardLast4: order.cardLast4,
+            openpayChargeId: (order as any).openpayChargeId || null,
+          },
+        };
+      }
+
+      if (!order.stripeId) {
+        return ctx.badRequest("Este pedido no tiene un identificador de Openpay.");
+      }
+
+      const charge = await findOpenpayChargeByOrderId(
+        order.stripeId,
+        new Date(order.createdAt as any),
+      );
+
+      if (!charge) {
+        return {
+          data: {
+            reconciled: false,
+            found: false,
+            message: "No se encontró ningún cargo en Openpay para este pedido todavía.",
+          },
+        };
+      }
+
+      if (charge.status !== "completed") {
+        const info = extractPaymentInfo(charge);
+        return {
+          data: {
+            reconciled: false,
+            found: true,
+            openpayStatus: charge.status,
+            openpayChargeId: charge.id,
+            ...info,
+          },
+        };
+      }
+
+      if (Number(charge.amount) !== Number(order.total)) {
+        return ctx.badRequest(
+          `El monto del cargo en Openpay ($${charge.amount}) no coincide con el total del pedido ($${order.total}). Revísalo manualmente antes de continuar.`,
+        );
+      }
+
+      const { paymentInfo } = await reconcilePaidOrder(strapi, order, charge);
+      console.log(
+        `✅ Orden ${order.documentId} marcada como PAGADA (verificación manual admin)`,
+      );
+
+      return {
+        data: {
+          reconciled: true,
+          found: true,
+          openpayStatus: charge.status,
+          openpayChargeId: charge.id,
+          ...paymentInfo,
         },
       };
     },

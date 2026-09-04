@@ -19,5 +19,14 @@ export default {
         middlewares: [],
       },
     },
+    {
+      method: "POST",
+      path: "/orders/:id/verify-payment",
+      handler: "order.verifyPayment",
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
   ],
 };
