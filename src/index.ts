@@ -28,6 +28,52 @@ const AUTHENTICATED_ROLE_REQUIRED_ACTIONS = [
   "api::address.address.delete",
 ];
 
+// Acciones que el rol custom "Admin" (plugin::users-permissions.role,
+// distinto del superadmin del panel de Strapi) necesita para poder usar el
+// panel de admin de la tienda. Strapi exige el checkbox de permiso
+// habilitado para la accion ANTES de llegar al controller, incluso en
+// rutas escritas a mano con policies:[] (el controller de sucursal valida
+// isAdminUser aparte, pero eso nunca corre si el permiso no esta
+// habilitado - da un 403 generico). Se asegura en cada arranque porque no
+// hay acceso al panel de Strapi en produccion para marcar el checkbox a mano.
+const ADMIN_ROLE_REQUIRED_ACTIONS = [
+  "api::sucursal.sucursal.create",
+  "api::sucursal.sucursal.update",
+  "api::sucursal.sucursal.delete",
+];
+
+async function ensureAdminPermissions({ strapi }: { strapi: any }) {
+  try {
+    const adminRole = await strapi
+      .query("plugin::users-permissions.role")
+      .findOne({ where: { name: "Admin" } });
+
+    if (!adminRole) return;
+
+    const existing = await strapi
+      .query("plugin::users-permissions.permission")
+      .findMany({
+        where: { action: { $in: ADMIN_ROLE_REQUIRED_ACTIONS }, role: adminRole.id },
+      });
+    const existingActions = new Set(existing.map((p: any) => p.action));
+    const missing = ADMIN_ROLE_REQUIRED_ACTIONS.filter((a) => !existingActions.has(a));
+
+    if (missing.length === 0) return;
+
+    for (const action of missing) {
+      await strapi.query("plugin::users-permissions.permission").create({
+        data: { action, role: adminRole.id },
+      });
+    }
+
+    strapi.log.info(
+      `🔓 Se otorgaron ${missing.length} permiso(s) al rol Admin: ${missing.join(", ")}`,
+    );
+  } catch (err) {
+    strapi.log.error("Error al otorgar permisos requeridos a Admin:", err);
+  }
+}
+
 async function revokeForbiddenPublicPermissions({ strapi }: { strapi: any }) {
   try {
     const publicRole = await strapi
@@ -278,6 +324,7 @@ export default {
   async bootstrap({ strapi }: { strapi: any }) {
     await revokeForbiddenPublicPermissions({ strapi });
     await ensureAuthenticatedPermissions({ strapi });
+    await ensureAdminPermissions({ strapi });
     await seedDefaultSucursales({ strapi });
     await ensureBrandedEmailTemplates({ strapi });
   },
