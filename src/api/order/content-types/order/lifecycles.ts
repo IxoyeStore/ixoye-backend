@@ -10,7 +10,7 @@ import { sendPushToAdmins, sendPushToUser } from '../../../../utils/push-notific
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
   paid: 'Pagado',
-  processing: 'En preparación',
+  processing: 'En proceso',
   shipped: 'En camino',
   delivered: 'Entregado',
   cancelled: 'Cancelado',

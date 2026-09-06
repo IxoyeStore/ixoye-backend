@@ -688,7 +688,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     openpayChargeId: Schema.Attribute.String;
     orderStatus: Schema.Attribute.Enumeration<
-      ['pending', 'paid', 'shipped', 'delivered', 'cancelled']
+      ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled']
     > &
       Schema.Attribute.DefaultTo<'pending'>;
     paymentMethod: Schema.Attribute.String;
@@ -972,6 +972,7 @@ export interface ApiSucursalSucursal extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     mapsUrl: Schema.Attribute.String & Schema.Attribute.Required;
     name: Schema.Attribute.String & Schema.Attribute.Required;
+    phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

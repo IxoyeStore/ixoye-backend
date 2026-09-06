@@ -44,6 +44,7 @@
       "enum": [
         "pending",
         "paid",
+        "processing",
         "shipped",
         "delivered",
         "cancelled"

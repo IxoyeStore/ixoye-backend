@@ -300,7 +300,19 @@ async function reconcilePaidOrder(
     console.error("⚠️ Error email:", e);
   }
 
-  return { updatedOrder, paymentInfo };
+  // El pago confirmado significa que la tienda ya acepto el pedido y lo va
+  // a preparar: se avanza directo a "processing" en vez de dejarlo en
+  // "paid" a la espera de que alguien lo mueva a mano. Es un update
+  // separado (no parte del payload de arriba) para que el lifecycle hook
+  // de order (beforeUpdate/afterUpdate) dispare su propia notificacion
+  // push por cada transicion de estado - el cliente recibe la de "pago
+  // exitoso" y luego la de "pedido en proceso", una por cada salto real.
+  const processingOrder = await strapi.documents("api::order.order").update({
+    documentId: order.documentId,
+    data: { orderStatus: "processing" } as any,
+  });
+
+  return { updatedOrder: processingOrder, paymentInfo };
 }
 
 // Busca en Openpay el cargo asociado a nuestro order_id. Se usa cuando
@@ -676,10 +688,14 @@ export default factories.createCoreController(
             return ctx.send({ received: true });
           }
 
-          if (order.orderStatus !== "paid") {
+          if (order.orderStatus === "pending") {
             // El cuerpo del webhook no es confiable (endpoint publico, sin
             // firma). Se confirma la transaccion directamente con Openpay
-            // antes de marcar la orden como pagada.
+            // antes de marcar la orden como pagada. Se compara contra
+            // "pending" (no contra "paid") porque reconcilePaidOrder deja
+            // la orden en "processing", no en "paid" - un webhook
+            // reintentado no debe volver a reconciliar ni duplicar
+            // stock/correo/push.
             const verifiedCharge = await verifyOpenpayCharge(chargeId);
 
             if (!verifiedCharge) {
@@ -766,7 +782,11 @@ export default factories.createCoreController(
       const order = await strapi.documents("api::order.order").findOne({ documentId });
       if (!order) return ctx.notFound("Pedido no encontrado.");
 
-      if (order.orderStatus === "paid") {
+      // reconcilePaidOrder deja la orden en "processing" (no en "paid"), asi
+      // que "ya reconciliada" es cualquier estado distinto de "pending", no
+      // solo "paid" - si no, un segundo click en verificar volveria a
+      // descontar stock y mandar correo/push duplicados.
+      if (order.orderStatus !== "pending") {
         return {
           data: {
             reconciled: false,
