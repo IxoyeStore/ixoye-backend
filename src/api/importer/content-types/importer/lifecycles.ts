@@ -33,6 +33,10 @@ async function generateUniqueSlug(name: string): Promise<string> {
   return slugFinal;
 }
 
+// Si agregas/quitas un valor aqui, actualiza tambien la copia en el frontend:
+// ixoye-frontend/constants/vehicle-types.ts (VEHICLE_TYPES)
+const VEHICLE_TYPES = ["Automotriz", "Tractocamión", "Maquinaria", "Agricola"];
+
 const cleanNumber = (value: any): number => {
   if (typeof value === "number") return value;
   if (typeof value === "string") {
@@ -148,6 +152,7 @@ async function processExcelImport(result: any) {
       const rawDept           = col(row, "departamento",    "Departamento");
       const rawSubDept        = col(row, "subDepartamento", "Sub-Departamento");
       const rawType           = col(row, "tipoProducto",    "Tipo");
+      const rawVehicleType    = col(row, "tipoVehiculo",    "Tipo Vehiculo",   "Tipo Vehículo");
       const rawBrand          = col(row, "marca",           "Marca",           "brand");
       const rawSeries         = col(row, "series",          "Series");
       const rawMotors         = col(row, "motores",         "Motores");
@@ -171,7 +176,8 @@ async function processExcelImport(result: any) {
         code,
         department:    String(rawDept    || "").trim(),
         subDepartment: String(rawSubDept || "").trim(),
-        productType:   String(rawType    || "").trim(),
+        productType:   String(rawType        || "").trim(),
+        vehicleType:   String(rawVehicleType  || "").trim(),
         brand:         String(rawBrand   || "").trim(),
         series:        String(rawSeries  || "").trim(),
         motors:        String(rawMotors  || "").trim(),
@@ -193,6 +199,17 @@ async function processExcelImport(result: any) {
         limit: 1,
       });
       const existingProduct = existingResults?.[0] ?? null;
+      const isCreate = !existingProduct?.documentId;
+
+      const vehicleTypeValue = productPayload.vehicleType as string;
+      if (vehicleTypeValue && !VEHICLE_TYPES.includes(vehicleTypeValue)) {
+        console.error(`❌ SALTADO (tipoVehiculo invalido "${vehicleTypeValue}"): ${code}`);
+        continue;
+      }
+      if (isCreate && !vehicleTypeValue) {
+        console.error(`❌ SALTADO (tipoVehiculo obligatorio para productos nuevos): ${code}`);
+        continue;
+      }
 
       if (existingProduct?.documentId) {
         await strapi.documents("api::product.product").update({

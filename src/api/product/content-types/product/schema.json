@@ -47,6 +47,10 @@
       "type": "string",
       "required": false
     },
+    "vehicleType": {
+      "type": "string",
+      "required": false
+    },
     "price": {
       "type": "decimal",
       "required": true
