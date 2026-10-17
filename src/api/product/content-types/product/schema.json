@@ -79,6 +79,24 @@
       "type": "string",
       "required": false
     },
+    "applications": {
+      "type": "json"
+    },
+    "fitMakes": {
+      "type": "text"
+    },
+    "fitSeries": {
+      "type": "text"
+    },
+    "fitModels": {
+      "type": "text"
+    },
+    "fitEngines": {
+      "type": "text"
+    },
+    "oemNumbers": {
+      "type": "text"
+    },
     "imageCode": {
       "type": "string",
       "required": false

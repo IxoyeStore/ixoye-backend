@@ -786,6 +786,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
   };
   attributes: {
     active: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    applications: Schema.Attribute.JSON;
     brand: Schema.Attribute.String;
     category: Schema.Attribute.Relation<'manyToOne', 'api::category.category'>;
     code: Schema.Attribute.String &
@@ -796,6 +797,10 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     department: Schema.Attribute.String;
     description: Schema.Attribute.Text;
+    fitEngines: Schema.Attribute.Text;
+    fitMakes: Schema.Attribute.Text;
+    fitModels: Schema.Attribute.Text;
+    fitSeries: Schema.Attribute.Text;
     freeShipping: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     imageCode: Schema.Attribute.String;
     images: Schema.Attribute.JSON;
@@ -808,6 +813,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     motors: Schema.Attribute.String;
     oemCode: Schema.Attribute.String;
+    oemNumbers: Schema.Attribute.Text;
     price: Schema.Attribute.Decimal & Schema.Attribute.Required;
     productName: Schema.Attribute.String & Schema.Attribute.Required;
     productType: Schema.Attribute.String;
@@ -820,6 +826,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    vehicleType: Schema.Attribute.String;
     wholesalePrice: Schema.Attribute.Decimal;
   };
 }
