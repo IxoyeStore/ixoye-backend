@@ -81,7 +81,10 @@ function parseApplications(text) {
     } else if (section === "oem") {
       const idx = body.indexOf(":");
       if (idx < 0) continue;
-      app.oem.push({ make: splitMake(body.slice(0, idx)).make, numbers: splitList(body.slice(idx + 1)) });
+      // Si no es una marca conocida, todo lo que va antes de ":" es la marca ("Premium Filters", "Napa Gold")
+      const label = body.slice(0, idx).trim();
+      const known = MAKES.some((m) => label.toLowerCase() === m.toLowerCase() || label.toLowerCase().startsWith(m.toLowerCase() + " "));
+      app.oem.push({ make: known ? splitMake(label).make : label, numbers: splitList(body.slice(idx + 1)) });
     }
   }
   return app;

@@ -63,6 +63,16 @@ function main() {
     for (let y = a.desde; y <= a.hasta; y++) s.add(y);
   }
 
+  // consulta.js entrega las equivalencias como "MARCA CODIGO" (el nodo "MARCA|CODIGO" con espacio), así que
+  // la marca se reconoce con las del índice, las más largas primero: "ALFA ROMEO 7786225" -> Alfa Romeo / 7786225
+  const marcas = [...new Set([...i.vecinos.keys()].map((n) => n.split("|")[0]))].sort((a, b) => b.length - a.length);
+  const separaMarca = (codigo) => {
+    const m = marcas.find((x) => codigo.startsWith(x + " "));
+    if (m) return { marca: m, codigo: codigo.slice(m.length + 1) };
+    const [first, ...rest] = codigo.split(" ");
+    return { marca: first, codigo: rest.join(" ") };
+  };
+
   const porProducto = new Map(); // CLAVE -> Map("MARCA|MODELO|MOTOR" -> Set(años))
   let n = 0;
   const total = [...combos.values()].reduce((x, s) => x + s.size, 0);
@@ -106,10 +116,10 @@ function main() {
     // equivalencias con otras marcas, agrupadas: "BALDWIN PA10130" -> { make: "Baldwin", numbers: ["PA10130"] }
     const eq = new Map();
     for (const e of ficha?.equivalencias || []) {
-      const [m, ...c] = e.codigo.split(" ");
-      if (m === "?" || !c.length) continue;
+      const { marca: m, codigo: c } = separaMarca(e.codigo);
+      if (m === "?" || !c) continue;
       const mk = bonito(m);
-      (eq.get(mk) || eq.set(mk, new Set()).get(mk)).add(c.join(" "));
+      (eq.get(mk) || eq.set(mk, new Set()).get(mk)).add(c);
     }
     if (!vehicles.length && !eq.size) continue;
     resultado[clave] = {
