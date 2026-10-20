@@ -795,7 +795,6 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    department: Schema.Attribute.String;
     description: Schema.Attribute.Text;
     fitEngines: Schema.Attribute.Text;
     fitMakes: Schema.Attribute.Text;
@@ -823,7 +822,6 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     series: Schema.Attribute.String;
     slug: Schema.Attribute.UID<'productName'> & Schema.Attribute.Required;
     stock: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
-    subDepartment: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

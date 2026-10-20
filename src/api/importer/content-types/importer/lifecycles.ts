@@ -149,8 +149,6 @@ async function processExcelImport(result: any) {
       const rawPrice          = col(row, "precio",          "Precio Público",  "precio_publico");
       const rawWholesalePrice = col(row, "precioMayoreo",   "Precio Mayoreo",  "precio_mayoreo");
       const rawStock          = col(row, "stock",           "Stock");
-      const rawDept           = col(row, "departamento",    "Departamento");
-      const rawSubDept        = col(row, "subDepartamento", "Sub-Departamento");
       const rawType           = col(row, "tipoProducto",    "Tipo");
       const rawVehicleType    = col(row, "tipoVehiculo",    "Tipo Vehiculo",   "Tipo Vehículo");
       const rawBrand          = col(row, "marca",           "Marca",           "brand");
@@ -174,8 +172,6 @@ async function processExcelImport(result: any) {
         wholesalePrice: rawWholesalePrice !== undefined ? cleanNumber(rawWholesalePrice) : undefined,
         stock:          Math.floor(cleanNumber(rawStock ?? 0)),
         code,
-        department:    String(rawDept    || "").trim(),
-        subDepartment: String(rawSubDept || "").trim(),
         productType:   String(rawType        || "").trim(),
         vehicleType:   String(rawVehicleType  || "").trim(),
         brand:         String(rawBrand   || "").trim(),

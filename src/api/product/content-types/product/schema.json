@@ -29,14 +29,6 @@
       "required": true,
       "unique": true
     },
-    "department": {
-      "type": "string",
-      "required": false
-    },
-    "subDepartment": {
-      "type": "string",
-      "required": false
-    },
     "category": {
       "type": "relation",
       "relation": "manyToOne",
