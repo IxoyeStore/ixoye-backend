@@ -801,6 +801,7 @@ export interface ApiProductProduct extends Struct.CollectionTypeSchema {
     fitMakes: Schema.Attribute.Text;
     fitModels: Schema.Attribute.Text;
     fitSeries: Schema.Attribute.Text;
+    fitVehicles: Schema.Attribute.Text;
     freeShipping: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     imageCode: Schema.Attribute.String;
     images: Schema.Attribute.JSON;

@@ -94,6 +94,9 @@
     "fitEngines": {
       "type": "text"
     },
+    "fitVehicles": {
+      "type": "text"
+    },
     "oemNumbers": {
       "type": "text"
     },

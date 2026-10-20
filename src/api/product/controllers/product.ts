@@ -31,6 +31,18 @@ function stripWholesalePrice(entity: any) {
   return entity;
 }
 
+// Los campos fit* son indices para filtrar (un filtro de aceite llega a 150 KB de
+// "|Marca::Modelo::Año::Motor|") y ningun cliente los lee: nunca se mandan.
+// `applications` solo hace falta en la pagina del producto (que lo pide por slug);
+// en las listas (catalogo, relacionados, buscador) se quita para que no pesen.
+const FIT_FIELDS = ['fitMakes', 'fitSeries', 'fitModels', 'fitEngines', 'fitVehicles'];
+function stripFitment(entity: any, keepApplications: boolean) {
+  if (!entity || typeof entity !== 'object') return entity;
+  for (const f of FIT_FIELDS) delete entity[f];
+  if (!keepApplications) delete entity.applications;
+  return entity;
+}
+
 // Arbol Marca -> Serie -> Modelos y Marca -> Motores para el buscador de
 // vehiculo del frontend. Se arma con el JSON `applications` de todos los
 // productos activos; es caro (miles de filas), asi que se cachea en memoria.
@@ -94,6 +106,64 @@ async function buildFitmentTree(strapi: any) {
   };
 }
 
+// Autos y camionetas (applications.vehicles, los carga scripts/import-vehicle-fitments.js):
+// Marca -> Modelo -> Año -> Motor. El arbol solo lleva marcas y modelos; los años y
+// motores de un modelo se piden aparte (/products/vehicle-years) para no mandar todo.
+type VehicleIndex = Map<string, Map<string, Map<number, Map<string, Set<number>>>>>; // marca > modelo > año > motor > ids
+let vehicleCache: { at: number; index: VehicleIndex; tree: any } | null = null;
+
+const yearsOf = (ranges: string[] = []) =>
+  ranges.flatMap((r) => {
+    const [from, to] = r.split('-').map(Number);
+    if (!from) return [];
+    return Array.from({ length: (to || from) - from + 1 }, (_, i) => from + i);
+  });
+
+async function buildVehicleIndex(strapi: any) {
+  const rows = await strapi.db.query('api::product.product').findMany({
+    where: { active: true, fitVehicles: { $notNull: true } },
+    select: ['id', 'applications'],
+  });
+
+  const index: VehicleIndex = new Map();
+  for (const { id, applications: app } of rows) {
+    for (const v of app?.vehicles ?? []) {
+      if (!index.has(v.make)) index.set(v.make, new Map());
+      const models = index.get(v.make)!;
+      if (!models.has(v.model)) models.set(v.model, new Map());
+      const years = models.get(v.model)!;
+      for (const y of yearsOf(v.years)) {
+        if (!years.has(y)) years.set(y, new Map());
+        const engines = years.get(y)!;
+        if (!engines.has(v.engine ?? '')) engines.set(v.engine ?? '', new Set());
+        engines.get(v.engine ?? '')!.add(id);
+      }
+    }
+  }
+
+  // cuantos productos distintos hay por marca y por modelo
+  const countIds = (maps: Iterable<Map<string, Set<number>>>) => {
+    const ids = new Set<number>();
+    for (const engines of maps) for (const s of engines.values()) s.forEach((id) => ids.add(id));
+    return ids;
+  };
+  const tree = {
+    makes: [...index.entries()]
+      .map(([name, models]) => {
+        const modelList = [...models.entries()].map(([model, years]) => ({ name: model, count: countIds(years.values()).size }));
+        const count = countIds([...models.values()].flatMap((y) => [...y.values()])).size;
+        return { name, count, models: modelList.sort((a, b) => naturalSort(a.name, b.name)) };
+      })
+      .sort((a, b) => b.count - a.count || naturalSort(a.name, b.name)),
+  };
+  return { at: Date.now(), index, tree };
+}
+
+async function vehicleData(strapi: any) {
+  if (!vehicleCache || Date.now() - vehicleCache.at > FITMENT_TTL_MS) vehicleCache = await buildVehicleIndex(strapi);
+  return vehicleCache;
+}
+
 // Categoria -> Tipos de producto (con conteos) para el menu "Categoria" del
 // frontend. Los tipos se agrupan sin distinguir mayusculas ("Balero" y
 // "BALERO" son uno) y se muestra la escritura mas usada; el catalogo filtra
@@ -148,6 +218,33 @@ export default factories.createCoreController('api::product.product', ({ strapi 
     ctx.body = fitmentCache.data;
   },
 
+  async vehicleTree(ctx) {
+    const { tree } = await vehicleData(strapi);
+    ctx.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+    ctx.body = tree;
+  },
+
+  // ?make=Nissan&model=Sentra -> [{ year: 2015, count, engines: [{ name: "1.8L", count }] }], año mas nuevo primero
+  async vehicleYears(ctx) {
+    const { make, model } = ctx.query as { make?: string; model?: string };
+    const years = (await vehicleData(strapi)).index.get(make ?? '')?.get(model ?? '');
+    ctx.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+    ctx.body = [...(years ?? new Map<number, Map<string, Set<number>>>()).entries()]
+      .map(([year, engines]) => {
+        const ids = new Set<number>();
+        engines.forEach((s) => s.forEach((id) => ids.add(id)));
+        return {
+          year,
+          count: ids.size,
+          engines: [...engines.entries()]
+            .filter(([name]) => name)
+            .map(([name, s]) => ({ name, count: s.size }))
+            .sort((a, b) => naturalSort(a.name, b.name)),
+        };
+      })
+      .sort((a, b) => b.year - a.year);
+  },
+
   async categoryTree(ctx) {
     if (!categoryCache || Date.now() - categoryCache.at > FITMENT_TTL_MS) {
       categoryCache = { at: Date.now(), data: await buildCategoryTree(strapi) };
@@ -162,6 +259,10 @@ export default factories.createCoreController('api::product.product', ({ strapi 
     if (!allowed && Array.isArray(response?.data)) {
       response.data.forEach(stripWholesalePrice);
     }
+    // se conserva en la pagina del producto (por slug) o si se pide con fields=applications
+    const fields = Object.values((ctx.query?.fields as any) ?? {});
+    const keep = !!(ctx.query?.filters as any)?.slug || fields.includes('applications');
+    if (Array.isArray(response?.data)) response.data.forEach((p: any) => stripFitment(p, keep));
     return response;
   },
 
@@ -171,6 +272,7 @@ export default factories.createCoreController('api::product.product', ({ strapi 
     if (!allowed && response?.data) {
       stripWholesalePrice(response.data);
     }
+    if (response?.data) stripFitment(response.data, true);
     return response;
   },
 }));
